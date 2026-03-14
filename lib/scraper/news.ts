@@ -18,50 +18,47 @@ export interface NewsScrapeResult {
   classified: number  // articles sent to AI
 }
 
+interface PendingItem {
+  title: string
+  link: string
+  pubDate?: string
+  contentSnippet?: string
+  content?: string
+  sourceName: string
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
 
 export async function scrapeNews(): Promise<NewsScrapeResult> {
+  // Note: robots.txt is not checked here because RSS feeds are explicitly
+  // designed for programmatic consumption — providing a feed is an implicit
+  // invitation for automated readers.
   const parser = new Parser()
 
   let fetched = 0
   let stored = 0
   let classified = 0
 
-  // Collect new items (not already in DB) across all feeds up to the cap
-  interface PendingItem {
-    title: string
-    link: string
-    pubDate?: string
-    contentSnippet?: string
-    content?: string
-    sourceName: string
-  }
-
-  const pendingItems: PendingItem[] = []
+  // Collect all article URLs from all feeds first, then batch-check the DB
+  const allCandidates: PendingItem[] = []
 
   for (const source of RSS_SOURCES) {
-    if (pendingItems.length >= MAX_NEW_ARTICLES) break
+    if (allCandidates.length >= MAX_NEW_ARTICLES) break
 
     try {
       const feed = await parser.parseURL(source.url)
 
       for (const item of feed.items ?? []) {
-        if (pendingItems.length >= MAX_NEW_ARTICLES) break
+        if (allCandidates.length >= MAX_NEW_ARTICLES) break
 
         fetched++
 
         const url = item.link ?? ''
         if (!url) continue
 
-        // Skip articles already in the database
-        const existing = await prisma.newsEvent.findUnique({
-          where: { url },
-        })
-        if (existing) continue
-
-        pendingItems.push({
+        allCandidates.push({
           title: item.title ?? '',
           link: url,
           pubDate: item.pubDate,
@@ -76,6 +73,16 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
       )
     }
   }
+
+  // Batch duplicate check: one query for all candidate URLs
+  const allUrls = allCandidates.map((c) => c.link)
+  const existingRecords = await prisma.newsEvent.findMany({
+    where: { url: { in: allUrls } },
+    select: { url: true },
+  })
+  const existingUrls = new Set(existingRecords.map((r) => r.url))
+
+  const pendingItems = allCandidates.filter((c) => !existingUrls.has(c.link))
 
   // Process and store each new item
   let firstItem = true
@@ -100,7 +107,10 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
       published_at = new Date()
     }
 
-    // Classify the article via AI
+    // Classify the article via AI.
+    // classifyArticle() handles its own errors internally and always returns a
+    // result, so we increment classified unconditionally to reflect every
+    // article where AI classification was attempted.
     let classification = {
       topic: 'other' as const,
       sentiment: 'neutral' as const,
@@ -108,14 +118,8 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
       tags: [] as string[],
     }
 
-    try {
-      classification = await classifyArticle(headline, excerpt)
-      classified++
-    } catch (err) {
-      console.warn(
-        `[scraper/news] Classification failed for "${headline}": ${err instanceof Error ? err.message : String(err)}`
-      )
-    }
+    classification = await classifyArticle(headline, excerpt)
+    classified++
 
     // Look up linked bill by extracted bill number
     let linkedBill: { id: string } | null = null
