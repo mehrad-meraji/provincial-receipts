@@ -272,64 +272,68 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
 
   let upserted = 0
 
+  let firstBill = true
   for (const row of rows) {
-    // Polite delay between detail fetches
-    await delay(1000)
+    try {
+      // Polite delay between detail fetches (skip before the first bill)
+      if (!firstBill) {
+        await delay(1000)
+      }
+      firstBill = false
 
-    // Fetch detail page
-    const detail = await fetchBillDetail(row.url)
+      // Fetch detail page
+      const detail = await fetchBillDetail(row.url)
 
-    // Upsert bill (keyed on bill_number)
-    await prisma.bill.upsert({
-      where: { bill_number: row.bill_number },
-      create: {
-        bill_number: row.bill_number,
-        title: row.title,
-        sponsor: row.sponsor,
-        status: row.status,
-        date_introduced: row.date_introduced ?? undefined,
-        reading_stage: detail.reading_stage ?? undefined,
-        vote_results: detail.vote_results ?? undefined,
-        vote_by_party: detail.vote_by_party ?? undefined,
-        url: row.url,
-        last_scraped: new Date(),
-        tags: [],
-        impact_score: 0,
-        toronto_flagged: false,
-      },
-      update: {
-        title: row.title,
-        sponsor: row.sponsor,
-        status: row.status,
-        date_introduced: row.date_introduced ?? undefined,
-        reading_stage: detail.reading_stage ?? undefined,
-        vote_results: detail.vote_results ?? undefined,
-        vote_by_party: detail.vote_by_party ?? undefined,
-        url: row.url,
-        last_scraped: new Date(),
-      },
-    })
+      // Score the bill before the upsert so all data lands in one atomic write
+      const scoreResult = scoreBill(
+        {
+          title: row.title,
+          sponsor: row.sponsor,
+          scraperTags: detail.scraperTags,
+        },
+        taxonomy
+      )
 
-    // Score the bill and write results back
-    const scoreResult = scoreBill(
-      {
-        title: row.title,
-        sponsor: row.sponsor,
-        scraperTags: detail.scraperTags,
-      },
-      taxonomy
-    )
+      // Upsert bill (keyed on bill_number) with score included
+      await prisma.bill.upsert({
+        where: { bill_number: row.bill_number },
+        create: {
+          bill_number: row.bill_number,
+          title: row.title,
+          sponsor: row.sponsor,
+          status: row.status,
+          date_introduced: row.date_introduced ?? undefined,
+          reading_stage: detail.reading_stage ?? undefined,
+          vote_results: detail.vote_results ?? undefined,
+          vote_by_party: detail.vote_by_party ?? undefined,
+          url: row.url,
+          last_scraped: new Date(),
+          tags: scoreResult.tags,
+          impact_score: scoreResult.impact_score,
+          toronto_flagged: scoreResult.toronto_flagged,
+        },
+        update: {
+          title: row.title,
+          sponsor: row.sponsor,
+          status: row.status,
+          date_introduced: row.date_introduced ?? undefined,
+          reading_stage: detail.reading_stage ?? undefined,
+          vote_results: detail.vote_results ?? undefined,
+          vote_by_party: detail.vote_by_party ?? undefined,
+          url: row.url,
+          last_scraped: new Date(),
+          tags: scoreResult.tags,
+          impact_score: scoreResult.impact_score,
+          toronto_flagged: scoreResult.toronto_flagged,
+        },
+      })
 
-    await prisma.bill.update({
-      where: { bill_number: row.bill_number },
-      data: {
-        impact_score: scoreResult.impact_score,
-        tags: scoreResult.tags,
-        toronto_flagged: scoreResult.toronto_flagged,
-      },
-    })
-
-    upserted++
+      upserted++
+    } catch (err) {
+      console.warn(
+        `[scraper] Failed to process bill ${row.bill_number}: ${err instanceof Error ? err.message : String(err)}`
+      )
+    }
   }
 
   // Advance the cursor
