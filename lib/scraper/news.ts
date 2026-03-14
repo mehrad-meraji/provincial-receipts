@@ -5,7 +5,7 @@
 // 60s function timeout.
 
 import Parser from 'rss-parser'
-import { classifyArticle, extractBillNumber } from '@/lib/ai/classify'
+import { classifyArticle, extractBillNumber, type ArticleClassification } from '@/lib/ai/classify'
 import { prisma } from '@/lib/db'
 import { delay } from './utils'
 import { RSS_SOURCES } from './rss-sources'
@@ -111,11 +111,11 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
     // classifyArticle() handles its own errors internally and always returns a
     // result, so we increment classified unconditionally to reflect every
     // article where AI classification was attempted.
-    let classification = {
-      topic: 'other' as const,
-      sentiment: 'neutral' as const,
+    let classification: ArticleClassification = {
+      topic: 'other',
+      sentiment: 'neutral',
       is_scandal: false,
-      tags: [] as string[],
+      tags: [],
     }
 
     classification = await classifyArticle(headline, excerpt)

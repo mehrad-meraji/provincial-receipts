@@ -89,7 +89,7 @@ async function fetchMppEmail(detailUrl: string): Promise<string | null> {
     // TODO: verify selectors against live OLA HTML after first deployment
     const emailEl = $('.field--name-field-email a')
     const email = emailEl.attr('href')?.replace(/^mailto:/i, '').trim()
-    return email ?? emailEl.text().trim() || null
+    return (email ?? emailEl.text().trim()) || null
   } catch {
     return null
   }
@@ -127,7 +127,7 @@ export async function scrapeMpps(): Promise<MppScrapeResult> {
         row.riding.includes(keyword)
       )
 
-      await prisma.mpp.upsert({
+      await prisma.mPP.upsert({
         where: { name_riding: { name: row.name, riding: row.riding } },
         create: {
           name: row.name,
