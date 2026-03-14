@@ -1,7 +1,7 @@
 {
   "crons": [
-    { "path": "/api/cron/scrape-bills",      "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/scrape-news",       "schedule": "0 * * * *"   },
+    { "path": "/api/cron/scrape-bills",      "schedule": "0 6 * * *"   },
+    { "path": "/api/cron/scrape-news",       "schedule": "0 7 * * *"   },
     { "path": "/api/cron/scrape-hansard",    "schedule": "0 8 * * *"   },
     { "path": "/api/cron/scrape-mpps",       "schedule": "0 8 * * 1"   },
     { "path": "/api/cron/discover-keywords", "schedule": "0 9 * * 1"   }
