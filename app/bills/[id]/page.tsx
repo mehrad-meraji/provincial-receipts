@@ -86,7 +86,7 @@ export default async function BillPage({ params }: PageProps) {
           <div className="mb-6">
             <SectionDivider label="Tags" />
             <div className="flex flex-wrap gap-2">
-              {bill.tags.map(tag => (
+              {bill.tags.map((tag: string) => (
                 <span key={tag} className="text-xs font-mono px-2 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded">
                   #{tag}
                 </span>

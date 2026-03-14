@@ -79,7 +79,7 @@ Return valid JSON only:
   }
 
   // 4–6. Upsert each suggestion into the DB
-  const existingMap = new Map(existingSuggestions.map((s) => [s.term, s.seen_count]))
+  const existingMap = new Map<string, number>(existingSuggestions.map((s) => [s.term, s.seen_count] as [string, number]))
 
   let promoted = 0
   let newSuggestions = 0
