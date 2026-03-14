@@ -1,65 +1,108 @@
-import Image from "next/image";
+import { prisma } from '@/lib/db'
+import Masthead from './components/layout/Masthead'
+import DatelineBar from './components/layout/DatelineBar'
+import SectionDivider from './components/layout/SectionDivider'
+import TorontoAlertBanner from './components/bills/TorontoAlertBanner'
+import KPIStrip from './components/bills/KPIStrip'
+import BillTable from './components/bills/BillTable'
+import ScandalFeed from './components/news/ScandalFeed'
+import MPPCard from './components/mpps/MPPCard'
 
-export default function Home() {
+// Revalidate every 5 minutes
+export const revalidate = 300
+
+const PASSED_STATUSES = ['Royal Assent', 'Proclaimed in Force']
+const ACTIVE_EXCLUDED = [...PASSED_STATUSES, 'Withdrawn']
+const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+
+export default async function HomePage() {
+  // Fetch all dashboard data in parallel
+  const [
+    torontoBills,
+    activeBillsCount,
+    scandalsCount,
+    passedLawsCount,
+    topBills,
+    recentNews,
+    torontoMpps,
+  ] = await Promise.all([
+    prisma.bill.count({ where: { toronto_flagged: true } }),
+    prisma.bill.count({ where: { status: { notIn: ACTIVE_EXCLUDED } } }),
+    prisma.newsEvent.count({ where: { is_scandal: true, published_at: { gte: THIRTY_DAYS_AGO } } }),
+    prisma.bill.count({ where: { status: { in: PASSED_STATUSES } } }),
+    prisma.bill.findMany({
+      where: { toronto_flagged: true },
+      orderBy: { impact_score: 'desc' },
+      take: 20,
+    }),
+    prisma.newsEvent.findMany({
+      orderBy: { published_at: 'desc' },
+      take: 20,
+    }),
+    prisma.mPP.findMany({
+      where: { toronto_area: true },
+      include: { _count: { select: { bills: true } } },
+      orderBy: { name: 'asc' },
+      take: 12,
+    }),
+  ])
+
+  const topBillTitle = topBills[0]?.title
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="min-h-screen">
+      <Masthead />
+      <TorontoAlertBanner count={torontoBills} topBillTitle={topBillTitle} />
+      <DatelineBar />
+
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+        {/* KPI Strip */}
+        <KPIStrip
+          torontoBills={torontoBills}
+          activeBills={activeBillsCount}
+          scandals30d={scandalsCount}
+          passedLaws={passedLawsCount}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+
+        {/* Bills Section */}
+        <section>
+          <SectionDivider label="Bills Affecting Toronto" />
+          <BillTable bills={topBills} />
+        </section>
+
+        {/* Two-column layout: News + MPPs */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Scandal Feed - wider column */}
+          <section className="lg:col-span-2">
+            <SectionDivider label="Queen's Park Watch" />
+            <ScandalFeed items={recentNews} />
+          </section>
+
+          {/* Toronto MPPs - narrower column */}
+          <section>
+            <SectionDivider label="Toronto Area MPPs" />
+            <div className="grid grid-cols-1 gap-2">
+              {torontoMpps.map(mpp => (
+                <MPPCard
+                  key={mpp.id}
+                  mpp={{
+                    ...mpp,
+                    _count: { bills: mpp._count.bills },
+                  }}
+                />
+              ))}
+              {torontoMpps.length === 0 && (
+                <p className="text-sm text-zinc-400 font-mono">Run the MPP scraper to populate data.</p>
+              )}
+            </div>
+          </section>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+      </div>
+
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-12 py-6 text-center text-xs text-zinc-400 dark:text-zinc-600 font-mono">
+        <p>Data sourced from Ontario Legislative Assembly · Updated every 6 hours</p>
+        <p className="mt-1">This is a civic transparency project. Not affiliated with the Government of Ontario.</p>
+      </footer>
+    </main>
+  )
 }
