@@ -432,7 +432,7 @@ CRON_SECRET          Developer-created secret — must be manually set in Vercel
 
 - OLA legislative pages are public record; scraping serves public interest journalism
 - Rate limiting (1.5s delay) and descriptive User-Agent ensure minimal server impact — **replace `contact@YOUR_EMAIL.com` with a real address before first deployment**
-- `robots.txt` checked at start of each `scrape-bills` run; scraping skipped if disallowed
+- `robots.txt` checked at start of each `scrape-bills`, `scrape-hansard`, and `scrape-mpps` run; scraping skipped if disallowed
 - No personal data collected from site visitors
 - AI classification applied only to public news text, never to private data
 - `CRON_SECRET`, `GITHUB_TOKEN`, and `DATABASE_URL` never exposed to client bundles — all sensitive calls are server-side only
