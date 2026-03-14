@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Bill {
+  id              String      @id @default(cuid())
+  bill_number     String      @unique
+  title           String
+  sponsor         String
+  status          String
+  date_introduced DateTime?
+  reading_stage   String?
+  vote_results    Json?
+  vote_by_party   Json?
+  url             String
+  impact_score    Float       @default(0)
+  tags            String[]
+  toronto_flagged Boolean     @default(false)
+  last_scraped    DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  sponsor_mpp     MPP?        @relation(fields: [sponsorMppId], references: [id])
+  sponsorMppId    String?
+  newsEvents      NewsEvent[]
+}
+
+model MPP {
+  id           String   @id @default(cuid())
+  name         String
+  party        String
+  riding       String
+  email        String?
+  url          String?
+  toronto_area Boolean  @default(false)
+  bills        Bill[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([name, riding])
+}
+
+model NewsEvent {
+  id           String   @id @default(cuid())
+  headline     String
+  url          String   @unique
+  source       String
+  published_at DateTime
+  topic        String?
+  sentiment    String?
+  is_scandal   Boolean  @default(false)
+  tags         String[]
+  bill         Bill?    @relation(fields: [billId], references: [id])
+  billId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ScrapeState {
+  id              String   @id @default("singleton")
+  last_bill_page  Int      @default(0)
+  last_scraped_at DateTime @default(now())
+}
+
+model KeywordSuggestion {
+  id           String   @id @default(cuid())
+  term         String   @unique
+  weight       Int
+  category     String
+  seen_count   Int      @default(1)
+  status       String   @default("pending")
+  source_bills String[]
+  createdAt    DateTime @default(now())
+}
