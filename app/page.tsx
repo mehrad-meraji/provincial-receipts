@@ -1,3 +1,4 @@
+import type { MPP } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import Masthead from './components/layout/Masthead'
 import DatelineBar from './components/layout/DatelineBar'
@@ -8,8 +9,8 @@ import BillTable from './components/bills/BillTable'
 import ScandalFeed from './components/news/ScandalFeed'
 import MPPCard from './components/mpps/MPPCard'
 
-// Revalidate every 5 minutes
-export const revalidate = 300
+// Always SSR — data changes with every cron run
+export const dynamic = 'force-dynamic'
 
 const PASSED_STATUSES = ['Royal Assent', 'Proclaimed in Force']
 const ACTIVE_EXCLUDED = [...PASSED_STATUSES, 'Withdrawn']
@@ -82,7 +83,7 @@ export default async function HomePage() {
           <section>
             <SectionDivider label="Toronto Area MPPs" />
             <div className="grid grid-cols-1 gap-2">
-              {torontoMpps.map(mpp => (
+              {torontoMpps.map((mpp: MPP & { _count: { bills: number } }) => (
                 <MPPCard
                   key={mpp.id}
                   mpp={{

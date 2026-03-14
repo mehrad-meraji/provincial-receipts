@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import type { Bill } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import Masthead from '@/app/components/layout/Masthead'
 import DatelineBar from '@/app/components/layout/DatelineBar'
@@ -8,7 +9,7 @@ import StatusBadge from '@/app/components/bills/StatusBadge'
 import ImpactScore from '@/app/components/bills/ImpactScore'
 import LinkedNews from '@/app/components/mpps/LinkedNews'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -30,7 +31,7 @@ export default async function MPPPage({ params }: PageProps) {
   if (!mpp) notFound()
 
   // Get news linked to this MPP's bills
-  const billIds = mpp.bills.map(b => b.id)
+  const billIds = mpp.bills.map((b: Bill) => b.id)
   const linkedNews = billIds.length > 0
     ? await prisma.newsEvent.findMany({
         where: { billId: { in: billIds } },
@@ -74,7 +75,7 @@ export default async function MPPPage({ params }: PageProps) {
           <div className="mb-8">
             <SectionDivider label={`Bills Sponsored (${mpp.bills.length})`} />
             <div className="space-y-2">
-              {mpp.bills.map(bill => (
+              {mpp.bills.map((bill: Bill) => (
                 <div key={bill.id} className="flex items-center gap-3 py-2 border-b border-zinc-100 dark:border-zinc-800">
                   <span className="font-mono text-xs text-zinc-400 w-16 shrink-0">{bill.bill_number}</span>
                   <Link href={`/bills/${bill.id}`} className="text-sm hover:underline text-zinc-950 dark:text-white flex-1">

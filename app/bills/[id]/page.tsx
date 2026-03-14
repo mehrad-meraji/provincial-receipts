@@ -9,7 +9,7 @@ import ImpactScore from '@/app/components/bills/ImpactScore'
 import VoteBreakdown from '@/app/components/mpps/VoteBreakdown'
 import LinkedNews from '@/app/components/mpps/LinkedNews'
 
-export const revalidate = 300
+export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ id: string }>
