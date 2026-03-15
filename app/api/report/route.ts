@@ -16,6 +16,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validationError }, { status: 400 })
   }
 
+  if (!process.env.TURNSTILE_SECRET_KEY) {
+    return NextResponse.json({ error: 'Server misconfiguration' }, { status: 500 })
+  }
+
   const { type, targetId, targetTitle, categories, comment, turnstileToken } =
     body as {
       type: string
@@ -27,18 +31,23 @@ export async function POST(req: NextRequest) {
     }
 
   // 2. Verify Turnstile
-  const verifyRes = await fetch(
-    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        secret: process.env.TURNSTILE_SECRET_KEY,
-        response: turnstileToken,
-      }),
-    }
-  )
-  const verifyData = await verifyRes.json()
+  let verifyData: { success: boolean }
+  try {
+    const verifyRes = await fetch(
+      'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          secret: process.env.TURNSTILE_SECRET_KEY,
+          response: turnstileToken,
+        }),
+      }
+    )
+    verifyData = await verifyRes.json()
+  } catch {
+    return NextResponse.json({ error: 'Verification service unavailable' }, { status: 503 })
+  }
   if (verifyData.success !== true) {
     return NextResponse.json({ error: 'Turnstile verification failed' }, { status: 403 })
   }

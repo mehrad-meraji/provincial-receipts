@@ -81,6 +81,12 @@ it('skips rate limit check and succeeds when IP header is absent', async () => {
   expect(mockPrisma.report.count).not.toHaveBeenCalled()
 })
 
+it('returns 503 when Turnstile service is unavailable', async () => {
+  mockFetch.mockRejectedValueOnce(new Error('Network error'))
+  const res = await POST(makeRequest(validBody))
+  expect(res.status).toBe(503)
+})
+
 it('inserts report and returns ok:true on success', async () => {
   mockFetch.mockResolvedValueOnce({
     json: async () => ({ success: true }),
