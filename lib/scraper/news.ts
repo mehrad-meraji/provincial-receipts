@@ -9,6 +9,8 @@ import { classifyArticle, extractBillNumber, type ArticleClassification } from '
 import { prisma } from '@/lib/db'
 import { delay } from './utils'
 import { RSS_SOURCES } from './rss-sources'
+import { isBackedOff, setBackoff, clearBackoff } from './backoff'
+import { fetchNewsApiArticles } from './newsapi'
 
 const MAX_NEW_ARTICLES = 25
 
@@ -41,23 +43,31 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
   let stored = 0
   let classified = 0
 
-  // Collect all article URLs from all feeds first, then batch-check the DB
   const allCandidates: PendingItem[] = []
 
+  // --- NewsAPI (runs first, fills initial candidates) ---
+  const newsApiArticles = await fetchNewsApiArticles()
+  allCandidates.push(...newsApiArticles)
+  fetched += newsApiArticles.length
+
+  // --- RSS feeds (fill remaining capacity) ---
   for (const source of RSS_SOURCES) {
     if (allCandidates.length >= MAX_NEW_ARTICLES) break
 
+    if (await isBackedOff(source.id)) {
+      console.warn(`[scraper/news] ${source.name} backed off, skipping`)
+      continue
+    }
+
     try {
       const feed = await parser.parseURL(source.url)
+      await clearBackoff(source.id)
 
       for (const item of feed.items ?? []) {
         if (allCandidates.length >= MAX_NEW_ARTICLES) break
-
         fetched++
-
         const url = item.link ?? ''
         if (!url) continue
-
         allCandidates.push({
           title: item.title ?? '',
           link: url,
@@ -68,9 +78,11 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
         })
       }
     } catch (err) {
-      console.warn(
-        `[scraper/news] Failed to parse feed ${source.url}: ${err instanceof Error ? err.message : String(err)}`
-      )
+      const msg = String(err)
+      if (msg.includes('Status code 429')) {
+        await setBackoff(source.id, msg)
+      }
+      console.warn(`[scraper/news] Failed to parse feed ${source.url}: ${msg}`)
     }
   }
 
