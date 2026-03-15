@@ -5,7 +5,7 @@ export default function Masthead() {
     <header className="w-full border-b-4 border-zinc-950 dark:border-white py-6 px-4 text-center">
       {/* ASCII art - pre block with exact characters */}
       <pre
-        className="text-[0.45rem] sm:text-[0.55rem] md:text-[0.65rem] leading-none select-none overflow-x-auto font-mono inline-block text-left"
+        className="text-[0.45rem] sm:text-[0.55rem] md:text-[0.65rem] leading-none select-none font-mono inline-block text-left"
         aria-hidden="true"
       >
         {/* "FUCK DOUG" in dark charcoal */}
