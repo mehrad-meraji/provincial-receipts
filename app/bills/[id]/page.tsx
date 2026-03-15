@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { ExternalLink } from 'lucide-react'
+import ReportButton from '@/app/components/shared/ReportButton'
 import { prisma } from '@/lib/db'
 import Masthead from '@/app/components/layout/Masthead'
 import DatelineBar from '@/app/components/layout/DatelineBar'
@@ -52,9 +54,26 @@ export default async function BillPage({ params }: PageProps) {
             <StatusBadge status={bill.status} />
             <ImpactScore score={bill.impact_score} flagged={bill.toronto_flagged} />
           </div>
-          <h1 className="text-2xl font-serif font-bold text-zinc-950 dark:text-white leading-tight">
-            {bill.title}
-          </h1>
+          <div className="flex items-start justify-between gap-3 mt-2">
+            <h1 className="text-2xl font-serif font-bold text-zinc-950 dark:text-white leading-tight flex-1">
+              {bill.title}
+            </h1>
+            <div className="flex items-center gap-3 shrink-0 mt-1">
+              <a
+                href={bill.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-mono text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              >
+                full text <ExternalLink size={12} />
+              </a>
+              <ReportButton
+                type="bill"
+                targetId={bill.id}
+                targetTitle={`${bill.bill_number}: ${bill.title}`}
+              />
+            </div>
+          </div>
           <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400 font-mono">
             Sponsored by {bill.sponsor} · Introduced {dateStr}
             {bill.reading_stage && ` · ${bill.reading_stage}`}
@@ -103,17 +122,6 @@ export default async function BillPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* External link */}
-        <div className="mt-8">
-          <a
-            href={bill.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm font-mono text-zinc-500 hover:text-zinc-950 dark:hover:text-white underline"
-          >
-            View on Ontario Legislative Assembly →
-          </a>
-        </div>
       </div>
     </main>
   )
