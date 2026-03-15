@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaNeon } from '@prisma/adapter-neon'
+import { neonConfig } from '@neondatabase/serverless'
+
+if (typeof WebSocket !== 'undefined') {
+  neonConfig.webSocketConstructor = WebSocket
+}
 
 function makeClient() {
   const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! })

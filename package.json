@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cron": "export $(grep -v '^#' .env | xargs) && NODE_OPTIONS='--experimental-websocket' pnpx tsx scripts/cron.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",

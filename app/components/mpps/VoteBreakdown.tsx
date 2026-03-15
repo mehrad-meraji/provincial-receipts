@@ -13,7 +13,7 @@ export default function VoteBreakdown({ voteByParty, voteResults }: VoteBreakdow
       {voteResults && (
         <div className="flex gap-4 font-mono text-sm">
           <span className="text-green-600 dark:text-green-400">✓ {voteResults.yes} Yes</span>
-          <span className="text-red-600 dark:text-red-400">✗ {voteResults.no} No</span>
+          <span className="text-ontario-red dark:text-red-400">✗ {voteResults.no} No</span>
           {voteResults.abstain > 0 && (
             <span className="text-zinc-400">— {voteResults.abstain} Abstain</span>
           )}

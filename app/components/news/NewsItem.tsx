@@ -20,7 +20,7 @@ export default function NewsItem({ item }: NewsItemProps) {
   return (
     <div className={`border-b border-zinc-100 dark:border-zinc-800 py-3 ${item.is_scandal ? 'border-l-2 border-l-red-500 pl-3' : ''}`}>
       {item.is_scandal && (
-        <span className="inline-block text-xs font-mono uppercase tracking-wider text-red-600 dark:text-red-400 font-bold mb-1">
+        <span className="inline-block text-xs font-mono uppercase tracking-wider text-ontario-red dark:text-red-400 font-bold mb-1">
           Scandal
         </span>
       )}

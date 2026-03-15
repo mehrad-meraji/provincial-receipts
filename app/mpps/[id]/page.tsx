@@ -58,7 +58,7 @@ export default async function MPPPage({ params }: PageProps) {
           <div className="flex items-center gap-3 mb-2">
             <span className="text-xs font-mono px-2 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded">{mpp.party}</span>
             {mpp.toronto_area && (
-              <span className="text-xs font-mono text-red-600 dark:text-red-400">Toronto area</span>
+              <span className="text-xs font-mono text-ontario-red dark:text-red-400">Toronto area</span>
             )}
           </div>
           <h1 className="text-2xl font-serif font-bold text-zinc-950 dark:text-white">{mpp.name}</h1>

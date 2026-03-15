@@ -89,29 +89,115 @@ export function normaliseMinistryName(name: string): string {
     .toLowerCase()
     .replace(/^ministry of the\s+/i, '')
     .replace(/^ministry of\s+/i, '')
+    .replace(/&/g, 'and')
+    .replace(/[,\.]/g, '')
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
-/**
- * Parse the fiscal summary and ministry totals from chapter-3 HTML.
- * Throws if the revenue row cannot be found (indicates page structure changed).
- */
 export function parseBudgetSummary(html: string): SummaryResult {
   const $ = cheerio.load(html)
-
-  // ── Fiscal summary table ──
+  
   const fiscalValues = new Map<string, bigint>()
+  const ministryMap = new Map<string, { name: string; amount: bigint }>()
 
-  $('table tr').each((_i, row) => {
-    const cells = $(row).find('td')
-    if (cells.length < 2) return
-    const label = $(cells[0]).text().trim().toLowerCase()
-    const valueText = $(cells[1]).text().trim()
-    if (label.includes('total revenue')) {
-      try { fiscalValues.set('revenue', parseDollarString(valueText, 'billions')) } catch { /* skip */ }
-    } else if (label.includes('total expense') || label.includes('total expenditure')) {
-      try { fiscalValues.set('expense', parseDollarString(valueText, 'billions')) } catch { /* skip */ }
-    }
+  // Helper to find the column index for BUDGET_YEAR in a table
+  function findYearColumnIndex(table: any): number {
+    let colIndex = -1
+    // Target the first row (headers) to avoid counting labels in data rows
+    $(table).find('tr').first().find('th, td').each((idx: number, el: any) => {
+      const text = $(el).text().replace(/–/g, '-').replace(/\s+/g, '')
+      if (text.includes(BUDGET_YEAR)) {
+        colIndex = idx
+      }
+    })
+    return colIndex
+  }
+
+  // Helper to determine the unit of a table based on its text
+  function getTableUnit(table: any): 'billions' | 'millions' {
+    const text = $(table).text().toLowerCase()
+    return text.includes('billions') ? 'billions' : 'millions'
+  }
+
+  // 1. First pass: find fiscal summary items (Revenue, Expense) from any table
+  $('table').each((_i, table) => {
+    const colIndex = findYearColumnIndex(table)
+    if (colIndex === -1) return
+
+    const unit = getTableUnit(table)
+
+    $(table).find('tr').each((_j, row) => {
+      const cells = $(row).find('th, td')
+      if (cells.length <= colIndex) return
+
+      const label = $(cells[0]).text().trim().toLowerCase()
+      const valueText = $(cells[colIndex]).text().trim()
+      if (!valueText || valueText === '–') return
+
+      if (label === 'total revenue' || label.includes('total revenue')) {
+        try { fiscalValues.set('revenue', parseDollarString(valueText, unit)) } catch { /* skip */ }
+      } else if (label === 'total expense' || label.includes('total expense') || label.includes('total expenditure')) {
+        try { fiscalValues.set('expense', parseDollarString(valueText, unit)) } catch { /* skip */ }
+      }
+    })
+  })
+
+  // 2. Second pass: find Ministry expenditures (Table 3.10 is "Total Expense")
+  $('table').each((_i, table) => {
+    const caption = $(table).find('caption').text().toLowerCase()
+    const tableText = $(table).text()
+    
+    // Detailed ministry table 3.10 contains "(Base)" and "(Total)" markers
+    if (!caption.includes('expense') || !tableText.includes('(Base)')) return
+
+    const colIndex = findYearColumnIndex(table)
+    if (colIndex === -1) return
+
+    const unit = getTableUnit(table)
+
+    $(table).find('tr').each((_j, row) => {
+      const cells = $(row).find('th, td')
+      if (cells.length <= colIndex) return
+
+      let rawName = $(cells[0]).text().trim()
+      if (!rawName) return
+
+      // Exclude generic summary rows
+      const lowerName = rawName.toLowerCase()
+      if (lowerName === 'total expense' || lowerName.includes('total base programs') || lowerName.includes('significant exceptional') || lowerName.includes('interest and other debt')) {
+        return
+      }
+
+      // Cleanup: strip (Total), (Base) and footnotes
+      let cleanName = rawName
+        .replace(/\s*\([\s\w]+\)\s*$/i, '') // Strips (Base), (Total), (Total programs), etc
+        .replace(/sup.*$/i, '')            // Strips sup tags/markers if any leaked in
+        .replace(/\s+/g, ' ')
+        .trim()
+      
+      if (!cleanName) return
+
+      // Normalise for deduplication key
+      const normName = normaliseMinistryName(cleanName)
+
+      const valueText = $(cells[colIndex]).text().trim()
+      if (!valueText || valueText === '–') return
+
+      try {
+        const amount = parseDollarString(valueText, unit)
+        if (amount > 0n) {
+          const existing = ministryMap.get(normName)
+          // We prefer the larger amount if multiple rows exist (Total vs Base)
+          if (!existing || existing.amount < amount) {
+            ministryMap.set(normName, { name: cleanName, amount })
+          }
+        }
+      } catch {
+        // skip unparseable
+      }
+    })
   })
 
   const total_revenue = fiscalValues.get('revenue')
@@ -125,30 +211,7 @@ export function parseBudgetSummary(html: string): SummaryResult {
   }
 
   const deficit = total_expense - total_revenue
-
-  // ── Ministry/sector spending table ──
-  const ministries: Array<{ name: string; amount: bigint }> = []
-
-  $('table').each((_i, table) => {
-    const caption = $(table).find('caption').text().toLowerCase()
-    if (!caption.includes('program') && !caption.includes('expense') && !caption.includes('sector')) return
-
-    $(table).find('tr').each((_j, row) => {
-      const cells = $(row).find('td')
-      if (cells.length < 2) return
-      const name = $(cells[0]).text().trim()
-      const valueText = $(cells[1]).text().trim()
-      if (!name || !valueText.startsWith('$')) return
-      try {
-        const amount = parseDollarString(valueText, 'billions')
-        if (amount > 0n) {
-          ministries.push({ name, amount })
-        }
-      } catch {
-        // skip unparseable rows
-      }
-    })
-  })
+  const ministries = Array.from(ministryMap.values())
 
   return { total_revenue, total_expense, deficit, ministries }
 }
@@ -296,11 +359,13 @@ export async function scrapeBudget(): Promise<BudgetScrapeResult> {
       // Derive ministry name from URL slug for matching
       // e.g. ".../expenditure-estimates-ministry-health-2025-26" → "health"
       const slug = url.split('/').pop() ?? ''
-      const normSlug = slug
+      const rawSlugName = slug
         .replace(/expenditure-estimates-ministry-/, '')
         .replace(/-\d{4}-\d{2}$/, '')
         .replace(/-/g, ' ')
         .trim()
+      
+      const normSlug = normaliseMinistryName(rawSlugName)
 
       // Find matching ministry using normalised name or slug
       let dbMinistry = ministryByNorm.get(normSlug)
@@ -318,7 +383,7 @@ export async function scrapeBudget(): Promise<BudgetScrapeResult> {
       }
 
       if (!dbMinistry) {
-        console.warn(`[scraper/budget] No matching ministry for URL slug "${normSlug}" (${url})`)
+        console.warn(`[scraper/budget] No matching ministry for URL slug "${normSlug}" (${url}). Available: ${Array.from(ministryByNorm.keys()).join(', ')}`)
         continue
       }
 

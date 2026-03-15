@@ -5,7 +5,7 @@ interface ImpactScoreProps {
 
 export default function ImpactScore({ score, flagged }: ImpactScoreProps) {
   const colorClass =
-    score >= 7 ? 'text-red-600 dark:text-red-400' :
+    score >= 7 ? 'text-ontario-red dark:text-red-400' :
     score >= 4 ? 'text-orange-600 dark:text-orange-400' :
     score >= 1 ? 'text-yellow-600 dark:text-yellow-500' :
     'text-zinc-400 dark:text-zinc-600'

@@ -36,7 +36,7 @@ export default function MPPCard({ mpp }: MPPCardProps) {
         </span>
       </div>
       {mpp.toronto_area && (
-        <div className="mt-2 text-xs font-mono text-red-600 dark:text-red-400">Toronto area</div>
+        <div className="mt-2 text-xs font-mono text-ontario-red dark:text-red-400">Toronto area</div>
       )}
       {mpp._count && (
         <div className="mt-1 text-xs text-zinc-400 font-mono">{mpp._count.bills} bills</div>

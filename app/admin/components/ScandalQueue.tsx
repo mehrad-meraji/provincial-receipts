@@ -54,7 +54,7 @@ export default function ScandalQueue({ initialItems }: { initialItems: ScandalIt
               <button
                 onClick={() => handleAction(item.id, 'confirm')}
                 disabled={loading === item.id}
-                className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                className="px-3 py-1 text-xs bg-ontario-red text-white rounded hover:bg-red-700 disabled:opacity-50"
               >
                 Confirm
               </button>

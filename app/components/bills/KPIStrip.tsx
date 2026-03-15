@@ -49,7 +49,7 @@ export default function KPIStrip({
       {kpis.map(({ label, value, danger, href }) => {
         const content = (
           <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-center">
-            <div className={`text-2xl font-mono font-bold tabular-nums ${danger ? 'text-red-600 dark:text-red-400' : 'text-zinc-950 dark:text-white'}`}>
+            <div className={`text-2xl font-mono font-bold tabular-nums ${danger ? 'text-ontario-red dark:text-red-400' : 'text-zinc-950 dark:text-white'}`}>
               {value}
             </div>
             <div className="text-xs uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mt-1 font-mono">
