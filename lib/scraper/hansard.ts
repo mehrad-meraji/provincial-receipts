@@ -8,6 +8,7 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { buildHeaders, checkRobotsTxt, delay, getCurrentParliament } from './utils'
 import { STATIC_KEYWORDS } from '@/lib/classifier/keywords'
+import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_HANSARD_PATH_TEMPLATE =
@@ -123,6 +124,11 @@ async function fetchHansardDocument(
 // ---------------------------------------------------------------------------
 
 export async function scrapeHansard(): Promise<HansardScrapeResult> {
+  if (await isBackedOff('ola-hansard')) {
+    console.warn('[scraper/hansard] backed off, skipping')
+    return { entries: [] }
+  }
+
   // Detect current parliament dynamically
   const parliament = await getCurrentParliament()
   const hansardPath = OLA_HANSARD_PATH_TEMPLATE.replace('{parliament}', parliament)
@@ -133,7 +139,16 @@ export async function scrapeHansard(): Promise<HansardScrapeResult> {
     throw new Error(`robots.txt disallows scraping ${hansardPath}`)
   }
 
-  const links = await fetchHansardLinks()
+  let links: HansardLink[]
+  try {
+    links = await fetchHansardLinks()
+    await clearBackoff('ola-hansard')
+  } catch (err) {
+    if ((err as any)?.response?.status === 429) {
+      await setBackoff('ola-hansard', String(err))
+    }
+    throw err
+  }
   const keywordTerms = getAllKeywordTerms()
   const entries: HansardEntry[] = []
 
@@ -150,6 +165,10 @@ export async function scrapeHansard(): Promise<HansardScrapeResult> {
       const entry = await fetchHansardDocument(link, keywordTerms)
       entries.push(entry)
     } catch (err) {
+      if ((err as any)?.response?.status === 429) {
+        await setBackoff('ola-hansard', String(err))
+        break
+      }
       console.warn(
         `[scraper/hansard] Failed to fetch document ${link.url}: ${err instanceof Error ? err.message : String(err)}`
       )
