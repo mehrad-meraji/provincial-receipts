@@ -70,7 +70,10 @@ Before inserting, count `Report` rows with the same `ip` created in the last hou
    TURNSTILE_SECRET_KEY="your_secret_key_here"
    ```
 
-Note: `@marsidev/react-turnstile` is already in the project dependencies.
+Install the Turnstile React package before implementing:
+```
+pnpm add @marsidev/react-turnstile
+```
 
 ---
 
@@ -95,7 +98,7 @@ No authentication. Protected by Turnstile + per-IP rate limit.
 ```
 
 **Logic:**
-1. **Validate input** — return `400` if: `type` is not `'news'` or `'bill'`; `targetId` or `targetTitle` are empty strings; `categories` is empty or not an array; `turnstileToken` is absent
+1. **Validate input** — return `400` if: `type` is not `'news'` or `'bill'`; `targetId` or `targetTitle` are empty strings; `categories` is empty or not an array; `turnstileToken` is absent; `categories` includes `'other'` but `comment` is absent or blank
 2. **Verify Turnstile** — POST to `https://challenges.cloudflare.com/turnstile/v0/siteverify` with `{ secret: TURNSTILE_SECRET_KEY, response: turnstileToken }`. Parse JSON body; if `data.success !== true`, return `403`
 3. **Extract IP** — from `x-forwarded-for` header (first value)
 4. **Rate limit** — count `Report` rows with the same `ip` in the last hour; if ≥ 5 return `429`
@@ -192,7 +195,7 @@ Fetches current editable field values for the target item so `ResolveModal` can 
 
 **Response (bill):**
 ```ts
-{ url: string | null, status: string, toronto_flagged: boolean }
+{ url: string, status: string, toronto_flagged: boolean }
 ```
 
 Determines type by looking up the `Report` by `id`. If report or target not found, returns `404`.
@@ -212,8 +215,8 @@ Props: `type`, `targetId`, `targetTitle`, `onClose: () => void`
 Contains:
 - Category checkbox list (multi-select, min 1 required to submit)
 - Optional comment textarea
-- Invisible `<Turnstile siteKey={NEXT_PUBLIC_TURNSTILE_SITE_KEY} onSuccess={setToken} />` widget from `@marsidev/react-turnstile`
-- Cancel + Submit buttons (submit disabled until at least 1 category selected and Turnstile token is ready)
+- Invisible `<Turnstile siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!} onSuccess={setToken} />` widget from `@marsidev/react-turnstile`
+- Cancel + Submit buttons (submit disabled until: at least 1 category selected, Turnstile token is ready, and — if `'other'` is selected — comment is non-empty)
 - On submit: POST to `/api/report`, show brief "Thanks for your report" confirmation message, then close
 
 ---
@@ -284,7 +287,7 @@ Footer: "cancel" + "save & resolve". On save: POST to `/api/admin/reports/[id]/r
 ### `app/admin/page.tsx`
 - Add `prisma.report.findMany({ where: { status: 'pending' }, orderBy: { createdAt: 'desc' }, take: 200, select: { id: true, type: true, targetId: true, targetTitle: true, categories: true, comment: true, status: true, createdAt: true } })` to the existing `Promise.all`
 - Serialize `createdAt` before passing to client: `.map(r => ({ ...r, createdAt: r.createdAt.toISOString() }))`
-- Render `<ReportsPanel initialReports={reports} />` as the **first** section (above scandal queue)
+- Render `<ReportsPanel initialReports={reports} />` as the **first** section (above scandal queue), wrapped in a `<section>` with an `<h2>Reports ({reports.length})</h2>` heading to match the existing section convention
 
 ### `prisma/schema.prisma`
 - Add `Report` model
