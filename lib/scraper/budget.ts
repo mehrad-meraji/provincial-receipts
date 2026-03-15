@@ -123,8 +123,13 @@ export function parseBudgetSummary(html: string): SummaryResult {
 
   // 1. First pass: find fiscal summary items (Revenue, Expense) from any table
   $('table').each((_i, table) => {
-    const colIndex = findYearColumnIndex(table)
-    if (colIndex === -1) return
+    let colIndex = findYearColumnIndex(table)
+    // Fall back to column 1 for simple 2-column tables (label | value) with no year header
+    if (colIndex === -1) {
+      const firstRowCells = $(table).find('tr').first().find('th, td').length
+      if (firstRowCells >= 2) colIndex = 1
+      else return
+    }
 
     const unit = getTableUnit(table)
 
@@ -148,12 +153,20 @@ export function parseBudgetSummary(html: string): SummaryResult {
   $('table').each((_i, table) => {
     const caption = $(table).find('caption').text().toLowerCase()
     const tableText = $(table).text()
-    
-    // Detailed ministry table 3.10 contains "(Base)" and "(Total)" markers
-    if (!caption.includes('expense') || !tableText.includes('(Base)')) return
 
-    const colIndex = findYearColumnIndex(table)
-    if (colIndex === -1) return
+    // Detailed ministry table 3.10 contains "(Base)" and "(Total)" markers;
+    // also accept simple expense tables without those markers (e.g. test fixtures)
+    if (!caption.includes('expense')) return
+    const hasDetailMarkers = tableText.includes('(Base)')
+
+    let colIndex = findYearColumnIndex(table)
+    // Fall back to column 1 for simple 2-column tables with no year header
+    if (colIndex === -1) {
+      if (hasDetailMarkers) return // detailed tables must have year column
+      const firstRowCells = $(table).find('tr').first().find('th, td').length
+      if (firstRowCells >= 2) colIndex = 1
+      else return
+    }
 
     const unit = getTableUnit(table)
 

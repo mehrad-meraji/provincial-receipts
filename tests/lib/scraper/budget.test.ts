@@ -7,8 +7,9 @@ import { parseBudgetSummary, parseMinistryTocUrls, parseMinistryPrograms, normal
 const SUMMARY_HTML = `
 <html><body>
 <table>
-  <caption>Ontario's Fiscal Plan</caption>
+  <caption>Ontario's Fiscal Plan ($ Billions)</caption>
   <tbody>
+    <tr><th></th><th>2025-26</th></tr>
     <tr><td>Total Revenue</td><td>$218.0</td></tr>
     <tr><td>Total Expense</td><td>$232.5</td></tr>
     <tr><td>Reserve</td><td>($0.1)</td></tr>
@@ -16,8 +17,9 @@ const SUMMARY_HTML = `
   </tbody>
 </table>
 <table>
-  <caption>Program Expense</caption>
+  <caption>Program Expense ($ Billions)</caption>
   <tbody>
+    <tr><th></th><th>2025-26</th></tr>
     <tr><td>Health Sector</td><td>$91.1</td></tr>
     <tr><td>Education Sector</td><td>$41.0</td></tr>
   </tbody>

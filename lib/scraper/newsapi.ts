@@ -47,7 +47,7 @@ export async function fetchNewsApiArticles(): Promise<PendingItem[]> {
         pubDate: a.publishedAt,
         contentSnippet: a.description ?? '',
         content: a.content ?? '',
-        sourceName: `${a.source?.name ?? 'Unknown'}`,
+        sourceName: `NewsAPI: ${a.source?.name ?? 'Unknown'}`,
       }))
 
     // Deduplicate by content similarity (threshold 0.9)
