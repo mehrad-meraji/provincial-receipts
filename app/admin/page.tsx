@@ -1,0 +1,59 @@
+import { prisma } from '@/lib/db'
+import ScandalQueue from './components/ScandalQueue'
+import NewsFeedOverride from './components/NewsFeedOverride'
+import BillsOverride from './components/BillsOverride'
+
+export const dynamic = 'force-dynamic'
+
+export default async function AdminPage() {
+  const [pendingScandals, recentNews, flaggedBills] = await Promise.all([
+    prisma.newsEvent.findMany({
+      where: { scandal_review_status: 'pending' },
+      orderBy: { published_at: 'desc' },
+      select: { id: true, headline: true, url: true, source: true, published_at: true, excerpt: true },
+    }),
+    prisma.newsEvent.findMany({
+      orderBy: { published_at: 'desc' },
+      take: 50,
+      select: { id: true, headline: true, url: true, source: true, published_at: true, hidden: true },
+    }),
+    prisma.bill.findMany({
+      where: { toronto_flagged: true },
+      orderBy: { impact_score: 'desc' },
+      select: { id: true, bill_number: true, title: true, sponsor: true, status: true },
+    }),
+  ])
+
+  return (
+    <main className="max-w-4xl mx-auto px-4 py-8 space-y-12">
+      <h1 className="text-2xl font-bold font-mono">Admin</h1>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Scandal Queue ({pendingScandals.length})
+        </h2>
+        <ScandalQueue initialItems={pendingScandals.map(n => ({
+          ...n,
+          published_at: n.published_at.toISOString(),
+        }))} />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          News Feed Override
+        </h2>
+        <NewsFeedOverride initialItems={recentNews.map(n => ({
+          ...n,
+          published_at: n.published_at.toISOString(),
+        }))} />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Toronto Bills Override
+        </h2>
+        <BillsOverride flaggedBills={flaggedBills} />
+      </section>
+    </main>
+  )
+}
