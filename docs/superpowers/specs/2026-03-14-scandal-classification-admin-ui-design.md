@@ -17,16 +17,20 @@ Three related features to reduce false positives and add human oversight:
 
 ## Schema Changes
 
-### `NewsEvent` — two new fields
+### `NewsEvent` — three new fields
+
+These fields must be added to the `NewsEvent` model in `prisma/schema.prisma` as part of implementation (before the migration runs):
 
 ```prisma
+excerpt               String?
 hidden                Boolean  @default(false)
 scandal_review_status String?  // 'pending' | 'confirmed' | 'rejected'
 ```
 
+- `excerpt` — first 500 chars of `contentSnippet`/`content` from RSS, stored at scrape time for display in the admin scandal queue
 - `hidden` — admin-set override to remove an article from the public feed
 - `scandal_review_status` — tracks human review state for borderline scandal flags
-  - `null` — not under review (auto-classified, keyword gate passed or failed cleanly)
+  - `null` — not under review (auto-classified cleanly)
   - `'pending'` — AI said scandal but keyword gate failed; awaiting human decision
   - `'confirmed'` — human confirmed as scandal (`is_scandal` set to `true`)
   - `'rejected'` — human rejected (`is_scandal` remains `false`)
@@ -41,6 +45,52 @@ Bills use manual admin overrides to `toronto_flagged` directly. No review status
 
 **File:** `lib/ai/classify.ts`
 
+### Types
+
+`ArticleClassification` gains one field:
+
+```ts
+export interface ArticleClassification {
+  topic: 'housing' | 'transit' | 'ethics' | 'environment' | 'finance' | 'other'
+  sentiment: 'scandal' | 'critical' | 'neutral' | 'positive'
+  is_scandal: boolean
+  tags: string[]
+  scandal_review_status: 'pending' | null  // classifier output only
+}
+```
+
+The DB field allows a wider set (`'pending' | 'confirmed' | 'rejected'`). Export a separate type for use in API routes:
+
+```ts
+export type ScandalReviewStatus = 'pending' | 'confirmed' | 'rejected'
+```
+
+### `DEFAULTS` constant — updated
+
+```ts
+const DEFAULTS: ArticleClassification = {
+  topic: 'other',
+  sentiment: 'neutral',
+  is_scandal: false,
+  tags: [],
+  scandal_review_status: null,
+}
+```
+
+### `parseClassification()` — updated
+
+Must include `scandal_review_status: null` in its return (the keyword gate runs in `classifyArticle`, not here):
+
+```ts
+return {
+  topic: parsed.topic ?? DEFAULTS.topic,
+  sentiment: parsed.sentiment ?? DEFAULTS.sentiment,
+  is_scandal: parsed.is_scandal ?? DEFAULTS.is_scandal,
+  tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+  scandal_review_status: null,
+}
+```
+
 ### 1. Tighter prompt
 
 Add explicit criteria to `PROMPT_TEMPLATE`:
@@ -49,7 +99,7 @@ Add explicit criteria to `PROMPT_TEMPLATE`:
 
 ### 2. Keyword gate
 
-After AI classification, apply a post-processing gate in `classifyArticle()`. A new exported constant:
+After AI classification, apply a post-processing gate in `classifyArticle()`. New exported constant:
 
 ```ts
 export const SCANDAL_KEYWORDS = [
@@ -60,34 +110,54 @@ export const SCANDAL_KEYWORDS = [
 ]
 ```
 
-Logic after AI response:
+Logic after calling `parseClassification()`:
 
 ```ts
 const keywordMatch = SCANDAL_KEYWORDS.some(kw =>
   `${headline} ${excerpt}`.toLowerCase().includes(kw)
 )
 
-if (aiResult.is_scandal && !keywordMatch) {
-  // Borderline: AI flagged but no keyword evidence — queue for review
-  return {
-    ...aiResult,
-    is_scandal: false,
-    scandal_review_status: 'pending',
-  }
+if (result.is_scandal && !keywordMatch) {
+  return { ...result, is_scandal: false, scandal_review_status: 'pending' }
 }
-// Keyword gate passed (or AI didn't flag scandal) — no review needed
-return { ...aiResult, scandal_review_status: null }
+return { ...result, scandal_review_status: null }
 ```
 
-`ArticleClassification` gains `scandal_review_status: 'pending' | null`.
+### Both `{ ...DEFAULTS }` return sites must be updated
 
-The `NewsEvent` upsert in `news.ts` writes `scandal_review_status` from the classification result.
+`classifyArticle()` has two places that return `{ ...DEFAULTS }`:
+1. The `catch` branch of `parseClassification()` (line 43 of current file)
+2. The `catch` branch of `classifyArticle()` itself (line 76) — this path bypasses `parseClassification()` entirely
+
+Both are covered by updating `DEFAULTS` to include `scandal_review_status: null` as specified above. The implementer must verify both sites return the full updated type — not just the `parseClassification` catch.
+
+### `news.ts` — updated `create` data block
+
+The manual default initialiser (lines 114–119) must include the new field:
+
+```ts
+let classification: ArticleClassification = {
+  topic: 'other',
+  sentiment: 'neutral',
+  is_scandal: false,
+  tags: [],
+  scandal_review_status: null,
+}
+```
+
+The `prisma.newsEvent.create` data block gains three fields:
+
+```ts
+excerpt: excerpt,  // already computed as rawExcerpt.slice(0, 500)
+hidden: false,
+scandal_review_status: classification.scandal_review_status,
+```
 
 ---
 
 ## Admin UI
 
-**Package:** `@clerk/nextjs` — new dependency
+**Package:** `@clerk/nextjs` v5+ — new dependency
 
 **New env vars** (added to `.env.example`):
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
@@ -95,7 +165,7 @@ The `NewsEvent` upsert in `news.ts` writes `scandal_review_status` from the clas
 
 ### Middleware
 
-New `middleware.ts` at project root:
+New `middleware.ts` at project root (Next.js App Router convention). Targets `@clerk/nextjs` v5 — `auth` is the resolved auth object, not a callable function:
 
 ```ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
@@ -103,8 +173,12 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 const isAdminRoute = createRouteMatcher(['/admin(.*)', '/api/admin(.*)'])
 
 export default clerkMiddleware((auth, req) => {
-  if (isAdminRoute(req)) auth().protect()
+  if (isAdminRoute(req)) auth.protect()
 })
+
+export const config = {
+  matcher: ['/((?!_next|.*\\..*).*)'],
+}
 ```
 
 Unauthenticated requests to `/admin/*` redirect to Clerk's hosted sign-in. Unauthenticated requests to `/api/admin/*` return 401.
@@ -124,7 +198,7 @@ Unauthenticated requests to `/admin/*` redirect to Clerk's hosted sign-in. Unaut
 
 Fetches: `NewsEvent` where `scandal_review_status: 'pending'`, ordered by `published_at desc`.
 
-Each item displays: headline (linked), source, published date, excerpt (truncated to 200 chars).
+Each item displays: headline (linked to article URL), source, published date, excerpt (from the stored `excerpt` field, no truncation needed — already capped at 500 chars at scrape time).
 
 Actions per item:
 - **Confirm** → `POST /api/admin/scandal-review` `{ id, action: 'confirm' }` → sets `is_scandal: true`, `scandal_review_status: 'confirmed'`
@@ -145,9 +219,7 @@ Two sub-sections:
 
 **Currently flagged** (`toronto_flagged: true`): bill number, title, sponsor, status. **Remove** button per item.
 
-**Search unflagged**: text input, searches `Bill` where `toronto_flagged: false` by title or sponsor (`contains`, case-insensitive). Results show bill number, title, sponsor. **Add** button per item.
-
-Search is a server action or GET to `/api/admin/bills-search?q=...`.
+**Search unflagged**: text input triggers a GET to `/api/admin/bills-search?q=...` (not a Server Action — GET route for consistency with other admin routes and to ensure Clerk session auth is enforced uniformly). Results show bill number, title, sponsor. **Add** button per item.
 
 Actions: `POST /api/admin/bill-flag` `{ id, action: 'add' | 'remove' }`
 
@@ -157,12 +229,12 @@ Actions: `POST /api/admin/bill-flag` `{ id, action: 'add' | 'remove' }`
 
 All routes validate Clerk session server-side via `auth()` from `@clerk/nextjs/server`. Return 401 if unauthenticated.
 
-| Route | Method | Body | Effect |
+| Route | Method | Body / Query | Effect |
 |---|---|---|---|
 | `/api/admin/scandal-review` | POST | `{ id, action: 'confirm' \| 'reject' }` | Updates `NewsEvent.is_scandal` and `scandal_review_status` |
 | `/api/admin/news-hide` | POST | `{ id, hidden: boolean }` | Updates `NewsEvent.hidden` |
 | `/api/admin/bill-flag` | POST | `{ id, action: 'add' \| 'remove' }` | Updates `Bill.toronto_flagged` |
-| `/api/admin/bills-search` | GET | `?q=string` | Returns matching unflagged bills |
+| `/api/admin/bills-search` | GET | `?q=string` | Returns `Bill[]` where `toronto_flagged: false` and title/sponsor contains `q` |
 
 ---
 
@@ -195,8 +267,8 @@ Scandal count KPI already filters `is_scandal: true` — no change needed there.
 | New | `app/api/admin/news-hide/route.ts` |
 | New | `app/api/admin/bill-flag/route.ts` |
 | New | `app/api/admin/bills-search/route.ts` |
-| Modified | `lib/ai/classify.ts` (tighter prompt, keyword gate, updated `ArticleClassification` type) |
-| Modified | `lib/scraper/news.ts` (write `scandal_review_status` to DB) |
+| Modified | `lib/ai/classify.ts` (tighter prompt, keyword gate, updated `ArticleClassification` type, updated `DEFAULTS` and `parseClassification`) |
+| Modified | `lib/scraper/news.ts` (write `excerpt`, `hidden`, `scandal_review_status` to DB; update manual default initialiser) |
 | Modified | `app/page.tsx` (add `hidden: false` filter to news query) |
 | Modified | `prisma/schema.prisma` |
 | Modified | `.env.example` |
@@ -207,11 +279,13 @@ Scandal count KPI already filters `is_scandal: true` — no change needed there.
 ## Deployment Notes
 
 1. Install Clerk: `npm install @clerk/nextjs`
-2. Create a Clerk application at clerk.com, add reviewers to the org/application
+2. Create a Clerk application at clerk.com, add reviewers as users
 3. Add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` to Vercel env vars
 4. Run migration locally: `npx prisma migrate dev --name add_news_admin_fields`
-5. Apply to production: `npx prisma migrate deploy`
-6. Deploy — existing articles keep `hidden: false` and `scandal_review_status: null` (no data backfill needed)
+5. **Apply migration to production BEFORE deploying app code**: `npx prisma migrate deploy`
+   - This is critical: `app/page.tsx` queries `hidden: false` which requires the column to exist. If the Vercel deploy races ahead of the migration, the homepage will fail with a Prisma unknown field error. Confirm the migration is applied in Neon before triggering a Vercel deploy.
+6. Deploy app code to Vercel
+7. Existing articles keep `hidden: false` (default), `excerpt: null`, and `scandal_review_status: null` (no data backfill needed)
 
 ---
 
