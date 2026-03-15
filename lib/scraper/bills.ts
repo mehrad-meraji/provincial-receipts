@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db'
 import { buildHeaders, checkRobotsTxt, delay, getCurrentParliament } from './utils'
 import { scoreBill } from '@/lib/classifier/score'
 import { loadTaxonomy } from '@/lib/classifier/keywords'
+import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_BILLS_PATH_TEMPLATE =
@@ -252,6 +253,11 @@ async function fetchBillDetail(detailUrl: string): Promise<BillDetail> {
 // ---------------------------------------------------------------------------
 
 export async function scrapeBillsPage(): Promise<BillScrapeResult> {
+  if (await isBackedOff('ola-bills')) {
+    console.warn('[scraper/bills] backed off, skipping')
+    return { scraped: 0, upserted: 0, page: 0, resetCycle: false }
+  }
+
   // Detect current parliament dynamically
   const parliament = await getCurrentParliament()
   const billsPath = OLA_BILLS_PATH_TEMPLATE.replace('{parliament}', parliament)
@@ -274,7 +280,16 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
   const page = state.last_bill_page + 1 // next page to scrape
 
   // Fetch list page
-  const rows = await fetchBillList(page, billsPath)
+  let rows: BillListRow[]
+  try {
+    rows = await fetchBillList(page, billsPath)
+    await clearBackoff('ola-bills')
+  } catch (err) {
+    if ((err as any)?.response?.status === 429) {
+      await setBackoff('ola-bills', String(err))
+    }
+    throw err
+  }
 
   // Handle end-of-pagination: reset cycle
   if (rows.length === 0) {
@@ -361,6 +376,10 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
 
       upserted++
     } catch (err) {
+      if ((err as any)?.response?.status === 429) {
+        await setBackoff('ola-bills', String(err))
+        break
+      }
       console.warn(
         `[scraper] Failed to process bill ${row.bill_number}: ${err instanceof Error ? err.message : String(err)}`
       )
