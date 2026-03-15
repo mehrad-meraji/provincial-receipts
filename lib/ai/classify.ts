@@ -16,11 +16,14 @@ function getClient(): OpenAI {
   return _client
 }
 
+export type ScandalReviewStatus = 'pending' | 'confirmed' | 'rejected'
+
 export interface ArticleClassification {
   topic: 'housing' | 'transit' | 'ethics' | 'environment' | 'finance' | 'other'
   sentiment: 'scandal' | 'critical' | 'neutral' | 'positive'
   is_scandal: boolean
   tags: string[]
+  scandal_review_status: 'pending' | null
 }
 
 const DEFAULTS: ArticleClassification = {
@@ -28,6 +31,7 @@ const DEFAULTS: ArticleClassification = {
   sentiment: 'neutral',
   is_scandal: false,
   tags: [],
+  scandal_review_status: null,
 }
 
 export function parseClassification(raw: string): ArticleClassification {
@@ -38,16 +42,26 @@ export function parseClassification(raw: string): ArticleClassification {
       sentiment: parsed.sentiment ?? DEFAULTS.sentiment,
       is_scandal: parsed.is_scandal ?? DEFAULTS.is_scandal,
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+      scandal_review_status: null,
     }
   } catch {
     return { ...DEFAULTS }
   }
 }
 
+export const SCANDAL_KEYWORDS = [
+  'corruption', 'misconduct', 'fraud', 'bribery', 'breach', 'unethical',
+  'cover-up', 'coverup', 'scandal', 'probe', 'investigation', 'fired',
+  'resigned', 'conflict of interest', 'kickback', 'inappropriate',
+  'improper', 'illegal', 'lawsuit', 'charged', 'convicted',
+]
+
 const PROMPT_TEMPLATE = (headline: string, excerpt: string) => `
 Classify this Ontario provincial politics news article.
 Headline: "${headline}"
 Excerpt: "${excerpt}"
+
+Mark is_scandal: true ONLY for credible evidence of misconduct, corruption, ethical breach, or abuse of power. Routine policy criticism, controversy, or opposition complaints are NOT scandals.
 
 Return valid JSON only, no prose:
 {
@@ -70,7 +84,14 @@ export async function classifyArticle(
       max_tokens: 200,
     })
     const raw = response.choices[0]?.message?.content ?? ''
-    return parseClassification(raw)
+    const result = parseClassification(raw)
+    const keywordMatch = SCANDAL_KEYWORDS.some(kw =>
+      `${headline} ${excerpt}`.toLowerCase().includes(kw)
+    )
+    if (result.is_scandal && !keywordMatch) {
+      return { ...result, is_scandal: false, scandal_review_status: 'pending' }
+    }
+    return { ...result, scandal_review_status: null }
   } catch (err) {
     console.error('[classify] AI call failed:', err)
     return { ...DEFAULTS }
