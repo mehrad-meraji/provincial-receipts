@@ -44,19 +44,22 @@ model MPP {
 }
 
 model NewsEvent {
-  id           String   @id @default(cuid())
-  headline     String
-  url          String   @unique
-  source       String
-  published_at DateTime
-  topic        String?
-  sentiment    String?
-  is_scandal   Boolean  @default(false)
-  tags         String[]
-  bill         Bill?    @relation(fields: [billId], references: [id])
-  billId       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  headline              String
+  url                   String   @unique
+  source                String
+  published_at          DateTime
+  topic                 String?
+  sentiment             String?
+  is_scandal            Boolean  @default(false)
+  tags                  String[]
+  excerpt               String?
+  hidden                Boolean  @default(false)
+  scandal_review_status String?
+  bill                  Bill?    @relation(fields: [billId], references: [id])
+  billId                String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model ScrapeState {
