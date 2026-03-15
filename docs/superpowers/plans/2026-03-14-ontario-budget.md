@@ -88,15 +88,17 @@ model BudgetProgram {
 npx prisma migrate dev --name add_budget_models
 ```
 
-Expected output: `✓ Your database is now in sync with your schema.`
+Expected output: `✓ Your database is now in sync with your schema.` (also auto-runs `prisma generate`)
 
-Also generates `prisma/client` — confirm no TypeScript errors:
+- [ ] **Step 3: Confirm Prisma client exposes new models**
 
 ```bash
-npx prisma generate
+npx tsc --noEmit
 ```
 
-- [ ] **Step 3: Commit**
+Expected: no errors. If you see `Property 'budgetSnapshot' does not exist on type PrismaClient`, re-run `npx prisma generate` manually.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/
@@ -131,7 +133,8 @@ describe('centsToNumber', () => {
 
 describe('formatBudgetAmount', () => {
   it('formats billions with one decimal', () => {
-    expect(formatBudgetAmount(14600000000000n)).toBe('$14.6B')
+    // $14.6B = 14,600,000,000 dollars = 1,460,000,000,000 cents
+    expect(formatBudgetAmount(1460000000000n)).toBe('$14.6B')
   })
 
   it('formats exactly 1 billion', () => {
@@ -259,13 +262,14 @@ const TOC_HTML = `
 </body></html>
 `
 
+// Per-ministry tables list amounts in millions (e.g. "$60,310" = $60,310M = ~$60.3B)
 const MINISTRY_HTML = `
 <html><body>
 <table>
   <caption>Program Summary</caption>
   <tbody>
-    <tr><td>Ontario Health Insurance Plan</td><td>$60.3</td></tr>
-    <tr><td>Hospital Services</td><td>$24.1</td></tr>
+    <tr><td>Ontario Health Insurance Plan</td><td>$60,310</td></tr>
+    <tr><td>Hospital Services</td><td>$24,100</td></tr>
   </tbody>
 </table>
 </body></html>
@@ -338,7 +342,8 @@ describe('parseMinistryPrograms', () => {
     const programs = parseMinistryPrograms(MINISTRY_HTML)
     expect(programs).toHaveLength(2)
     expect(programs[0].name).toBe('Ontario Health Insurance Plan')
-    expect(programs[0].amount).toBe(6030000000000n)
+    // $60,310M = 60310 × 1,000,000 dollars = 6,031,000,000,000 cents
+    expect(programs[0].amount).toBe(6031000000000n)
   })
 
   it('returns empty array if no program summary table found', () => {
@@ -793,20 +798,22 @@ git commit -m "feat: add scrape-budget cron route and vercel.json schedule"
 
 - [ ] **Step 1: Update KPIStrip to accept budget props**
 
-Replace the contents of `app/components/bills/KPIStrip.tsx`:
+Replace the contents of `app/components/bills/KPIStrip.tsx`.
+
+The budget tiles receive pre-formatted strings from `app/page.tsx` — no BigInt enters `KPIStrip` at all. The `grid-cols` is updated to `sm:grid-cols-3 lg:grid-cols-6` to accommodate up to 6 tiles without wrapping:
 
 ```tsx
 import Link from 'next/link'
-import { formatBudgetAmount } from '@/lib/format'
 
 interface KPIStripProps {
   torontoBills: number
   activeBills: number
   scandals30d: number
   passedLaws: number
-  // null when no budget data has been scraped yet
-  budgetDeficit: number | null
-  budgetTotalSpend: number | null
+  // Pre-formatted strings — null when no budget data has been scraped yet
+  budgetDeficitFormatted: string | null
+  budgetTotalSpendFormatted: string | null
+  budgetIsDeficit: boolean
   budgetFiscalYear: string | null
 }
 
@@ -815,30 +822,29 @@ export default function KPIStrip({
   activeBills,
   scandals30d,
   passedLaws,
-  budgetDeficit,
-  budgetTotalSpend,
+  budgetDeficitFormatted,
+  budgetTotalSpendFormatted,
+  budgetIsDeficit,
   budgetFiscalYear,
 }: KPIStripProps) {
-  const kpis = [
+  const kpis: Array<{ label: string; value: string; danger: boolean; href: string | null }> = [
     { label: 'Toronto Bills', value: String(torontoBills), danger: torontoBills > 10, href: null },
     { label: 'Active Bills', value: String(activeBills), danger: false, href: null },
     { label: 'Scandals (30d)', value: String(scandals30d), danger: scandals30d > 0, href: null },
     { label: 'Passed Laws', value: String(passedLaws), danger: false, href: null },
   ]
 
-  if (budgetDeficit !== null && budgetTotalSpend !== null) {
-    const deficitBigint = BigInt(Math.round(budgetDeficit * 100))
-    const spendBigint = BigInt(Math.round(budgetTotalSpend * 100))
+  if (budgetDeficitFormatted !== null && budgetTotalSpendFormatted !== null) {
     kpis.push(
       {
-        label: `${budgetFiscalYear ?? ''} Deficit`.trim(),
-        value: formatBudgetAmount(deficitBigint),
-        danger: budgetDeficit > 0,
+        label: 'Provincial Deficit',
+        value: budgetDeficitFormatted,
+        danger: budgetIsDeficit,
         href: '/budget',
       },
       {
         label: 'Annual Spend',
-        value: formatBudgetAmount(spendBigint),
+        value: budgetTotalSpendFormatted,
         danger: false,
         href: '/budget',
       }
@@ -846,10 +852,10 @@ export default function KPIStrip({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-zinc-200 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded overflow-hidden">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-zinc-200 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-800 rounded overflow-hidden">
       {kpis.map(({ label, value, danger, href }) => {
-        const inner = (
-          <div key={label} className="bg-white dark:bg-zinc-950 px-4 py-3 text-center">
+        const content = (
+          <div className="bg-white dark:bg-zinc-950 px-4 py-3 text-center">
             <div className={`text-2xl font-mono font-bold tabular-nums ${danger ? 'text-red-600 dark:text-red-400' : 'text-zinc-950 dark:text-white'}`}>
               {value}
             </div>
@@ -860,10 +866,10 @@ export default function KPIStrip({
         )
         return href ? (
           <Link key={label} href={href} className="hover:opacity-80 transition-opacity">
-            {inner}
+            {content}
           </Link>
         ) : (
-          <div key={label}>{inner}</div>
+          <div key={label}>{content}</div>
         )
       })}
     </div>
@@ -873,10 +879,10 @@ export default function KPIStrip({
 
 - [ ] **Step 2: Add budget query to app/page.tsx**
 
-In `app/page.tsx`, add the budget snapshot to the parallel `Promise.all`. Import `centsToNumber` at the top:
+In `app/page.tsx`, import `formatBudgetAmount` at the top:
 
 ```ts
-import { centsToNumber } from '@/lib/format'
+import { formatBudgetAmount } from '@/lib/format'
 ```
 
 Add to the destructured `Promise.all` array (after `torontoMpps`):
@@ -903,7 +909,7 @@ Destructure it:
   ] = await Promise.all([...])
 ```
 
-Pass to `KPIStrip`:
+Pass to `KPIStrip` — format the BigInt values here in the server component:
 
 ```tsx
         <KPIStrip
@@ -911,8 +917,9 @@ Pass to `KPIStrip`:
           activeBills={activeBillsCount}
           scandals30d={scandalsCount}
           passedLaws={passedLawsCount}
-          budgetDeficit={budgetSnapshot ? centsToNumber(budgetSnapshot.deficit) : null}
-          budgetTotalSpend={budgetSnapshot ? centsToNumber(budgetSnapshot.total_expense) : null}
+          budgetDeficitFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.deficit) : null}
+          budgetTotalSpendFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.total_expense) : null}
+          budgetIsDeficit={budgetSnapshot ? budgetSnapshot.deficit > 0n : false}
           budgetFiscalYear={budgetSnapshot?.fiscal_year ?? null}
         />
 ```
@@ -941,18 +948,20 @@ git commit -m "feat: add budget deficit and spend tiles to KPI strip"
 
 - [ ] **Step 1: Add Budget nav link below the subtitle**
 
-In `app/components/layout/Masthead.tsx`, add after the `<p>` subtitle tag and before the closing `</header>`:
+In `app/components/layout/Masthead.tsx`, add `import Link from 'next/link'` at the top of the file, then add the nav after the `<p>` subtitle tag and before the closing `</header>`:
 
 ```tsx
-      <nav className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-        <a href="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</a>
-        <a href="/budget" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Budget</a>
+import Link from 'next/link'
+```
+
+```tsx
+      <nav aria-label="Site navigation" className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
+        <Link href="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
+        <Link href="/budget" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Budget</Link>
       </nav>
 ```
 
-Add the import at the top if not present (Masthead is a server component, plain `<a>` is fine here):
-
-No import needed — plain `<a>` tags work for these simple nav links.
+Use `<Link>` (not `<a>`) for client-side navigation and prefetching. Masthead is a server component — `<Link>` is valid in server components in Next.js 14 App Router.
 
 - [ ] **Step 2: Commit**
 
@@ -983,15 +992,15 @@ import { useState } from 'react'
 interface Program {
   id: string
   name: string
-  amount: number // dollars
+  formattedAmount: string // pre-formatted by MinistryTable server component
 }
 
 interface MinistryRowProps {
   name: string
-  amount: number     // dollars
+  amount: number       // dollars — for % calculation only
   totalExpense: number // dollars — for % calculation
   programs: Program[]
-  formattedAmount: string
+  formattedAmount: string // pre-formatted by MinistryTable server component
 }
 
 export default function MinistryRow({ name, amount, totalExpense, programs, formattedAmount }: MinistryRowProps) {
@@ -1031,21 +1040,13 @@ export default function MinistryRow({ name, amount, totalExpense, programs, form
             {p.name}
           </td>
           <td className="py-2 px-4 font-mono text-xs text-right tabular-nums text-zinc-600 dark:text-zinc-400">
-            {/* Format sub-program amount */}
-            {formatProgramAmount(p.amount)}
+            {p.formattedAmount}
           </td>
           <td className="hidden sm:table-cell" />
         </tr>
       ))}
     </>
   )
-}
-
-function formatProgramAmount(dollars: number): string {
-  if (Math.abs(dollars) >= 1_000_000_000) {
-    return `$${(dollars / 1_000_000_000).toFixed(1)}B`
-  }
-  return `$${(dollars / 1_000_000).toFixed(1)}M`
 }
 ```
 
@@ -1060,7 +1061,7 @@ import { formatBudgetAmount, centsToNumber } from '@/lib/format'
 interface Program {
   id: string
   name: string
-  amount: bigint
+  amount: bigint // used only for formatting; converted before passing to MinistryRow
 }
 
 interface Ministry {
@@ -1098,7 +1099,7 @@ export default function MinistryTable({ ministries, totalExpense }: MinistryTabl
             programs={m.programs.map((p) => ({
               id: p.id,
               name: p.name,
-              amount: centsToNumber(p.amount),
+              formattedAmount: formatBudgetAmount(p.amount),
             }))}
           />
         ))}
@@ -1113,6 +1114,8 @@ export default function MinistryTable({ ministries, totalExpense }: MinistryTabl
 Create `app/components/budget/BudgetSummaryBar.tsx`:
 
 ```tsx
+// Server component — intentionally accepts bigint props from the parent server component.
+// Never make this a client component; bigint is not JSON-serialisable across client boundaries.
 import { formatBudgetAmount } from '@/lib/format'
 
 interface BudgetSummaryBarProps {
