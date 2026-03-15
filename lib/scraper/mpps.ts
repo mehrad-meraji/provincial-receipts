@@ -8,6 +8,7 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { prisma } from '@/lib/db'
 import { buildHeaders, checkRobotsTxt, delay } from './utils'
+import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_MPPS_PATH = '/en/members/current'
@@ -99,13 +100,27 @@ async function fetchMppEmail(detailUrl: string): Promise<string | null> {
 // ---------------------------------------------------------------------------
 
 export async function scrapeMpps(): Promise<MppScrapeResult> {
+  if (await isBackedOff('ola-mpps')) {
+    console.warn('[scraper/mpps] backed off, skipping')
+    return { scraped: 0, upserted: 0 }
+  }
+
   // Check robots.txt before any scraping
   const allowed = await checkRobotsTxt(OLA_BASE, OLA_MPPS_PATH)
   if (!allowed) {
     throw new Error(`robots.txt disallows scraping ${OLA_MPPS_PATH}`)
   }
 
-  const rows = await fetchMppList()
+  let rows: MppListRow[]
+  try {
+    rows = await fetchMppList()
+    await clearBackoff('ola-mpps')
+  } catch (err) {
+    if ((err as any)?.response?.status === 429) {
+      await setBackoff('ola-mpps', String(err))
+    }
+    throw err
+  }
 
   let upserted = 0
   let firstMpp = true
@@ -146,6 +161,10 @@ export async function scrapeMpps(): Promise<MppScrapeResult> {
 
       upserted++
     } catch (err) {
+      if ((err as any)?.response?.status === 429) {
+        await setBackoff('ola-mpps', String(err))
+        break
+      }
       console.warn(
         `[scraper/mpps] Failed to process MPP ${row.name}: ${err instanceof Error ? err.message : String(err)}`
       )
