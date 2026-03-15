@@ -85,3 +85,39 @@ model SourceBackoff {
   lastError    String?
   updatedAt    DateTime @updatedAt
 }
+
+model BudgetSnapshot {
+  id            String           @id @default(cuid())
+  fiscal_year   String           @unique
+  total_revenue BigInt
+  total_expense BigInt
+  deficit       BigInt
+  scraped_at    DateTime         @default(now()) @updatedAt
+  ministries    BudgetMinistry[]
+}
+
+model BudgetMinistry {
+  id         String          @id @default(cuid())
+  snapshot   BudgetSnapshot  @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  snapshotId String
+  name       String
+  sector     String?
+  amount     BigInt
+  sort_order Int             @default(0)
+  programs   BudgetProgram[]
+
+  @@unique([snapshotId, name])
+  @@index([snapshotId])
+}
+
+model BudgetProgram {
+  id         String         @id @default(cuid())
+  ministry   BudgetMinistry @relation(fields: [ministryId], references: [id], onDelete: Cascade)
+  ministryId String
+  name       String
+  amount     BigInt
+  sort_order Int            @default(0)
+
+  @@unique([ministryId, name])
+  @@index([ministryId])
+}
