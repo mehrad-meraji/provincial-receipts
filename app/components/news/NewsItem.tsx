@@ -1,3 +1,7 @@
+'use client'
+
+import ReportButton from '@/app/components/shared/ReportButton'
+
 interface NewsItemProps {
   item: {
     id: string
@@ -24,14 +28,17 @@ export default function NewsItem({ item }: NewsItemProps) {
           Scandal
         </span>
       )}
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block font-medium text-zinc-950 dark:text-white hover:underline leading-snug text-sm"
-      >
-        {item.headline}
-      </a>
+      <div className="flex items-start justify-between gap-2">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block font-medium text-zinc-950 dark:text-white hover:underline leading-snug text-sm flex-1"
+        >
+          {item.headline}
+        </a>
+        <ReportButton type="news" targetId={item.id} targetTitle={item.headline} />
+      </div>
       <div className="mt-1 flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500 font-mono">
         <span>{item.source}</span>
         <span>·</span>
