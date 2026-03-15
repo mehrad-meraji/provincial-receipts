@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
 
   const { ids, action } = await req.json() as { ids: string[]; action: 'dismiss' | 'resolve' }
 
-  if (!Array.isArray(ids) || ids.length === 0 || !ids.every(id => typeof id === 'string')) {
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every(id => typeof id === 'string' && id.length > 0)) {
     return NextResponse.json({ error: 'ids must be a non-empty array of strings' }, { status: 400 })
   }
   if (action !== 'dismiss' && action !== 'resolve') {

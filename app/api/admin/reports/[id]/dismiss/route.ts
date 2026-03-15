@@ -11,6 +11,9 @@ export async function POST(
 
   const { id } = await params
 
+  const report = await prisma.report.findUnique({ where: { id } })
+  if (!report) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+
   await prisma.report.update({
     where: { id },
     data: { status: 'dismissed' },
