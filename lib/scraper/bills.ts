@@ -13,7 +13,7 @@ import { loadTaxonomy } from '@/lib/classifier/keywords'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_BILLS_PATH =
-  '/en/legislative-business/bills/parliament/43/session/1'
+  '/en/legislative-business/bills/parliament-44/session-1'
 
 export interface BillScrapeResult {
   scraped: number     // bills processed
@@ -69,7 +69,7 @@ async function fetchBillList(page: number): Promise<BillListRow[]> {
         .find('td.views-field-field-bill-number')
         .text()
         .trim()
-      const titleEl = $(el).find('td.views-field-title a')
+      const titleEl = $(el).find('td.views-field-field-short-title a')
       const titleText = titleEl.text().trim()
       const href = titleEl.attr('href') ?? ''
       const fullUrl = href.startsWith('http') ? href : `${OLA_BASE}${href}`

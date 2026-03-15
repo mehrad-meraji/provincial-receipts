@@ -11,7 +11,7 @@ import { STATIC_KEYWORDS } from '@/lib/classifier/keywords'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_HANSARD_PATH =
-  '/en/legislative-business/house-documents/parliament-43/session-1/hansard'
+  '/en/legislative-business/house-documents/parliament-44/session-1'
 
 const MAX_DOCUMENTS = 5
 
@@ -57,16 +57,18 @@ async function fetchHansardLinks(): Promise<HansardLink[]> {
   const $ = cheerio.load(data)
   const links: HansardLink[] = []
 
-  // TODO: verify selectors against live OLA HTML after first deployment
-  $('.views-table tbody tr td a').each((_i, el) => {
+  // Parse date-based hansard links: /parliament-44/session-1/YYYY-MM-DD/hansard
+  $('a[href*="/hansard"]').each((_i, el) => {
     const href = $(el).attr('href') ?? ''
-    const dateText = $(el).text().trim()
-    if (!href) return
+    const dateText = $(el).find('time').attr('datetime')?.split('T')[0] ?? ''
+
+    if (!href || !href.includes('/hansard') || !dateText) return
+
     const fullUrl = href.startsWith('http') ? href : `${OLA_BASE}${href}`
     links.push({ date: dateText, url: fullUrl })
   })
 
-  // Return the most recent MAX_DOCUMENTS entries
+  // Return the most recent MAX_DOCUMENTS entries (already in reverse chronological order)
   return links.slice(0, MAX_DOCUMENTS)
 }
 
