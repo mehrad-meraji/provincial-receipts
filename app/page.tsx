@@ -1,5 +1,6 @@
 import type { MPP } from '@prisma/client'
 import { prisma } from '@/lib/db'
+import { formatBudgetAmount } from '@/lib/format'
 import Masthead from './components/layout/Masthead'
 import DatelineBar from './components/layout/DatelineBar'
 import SectionDivider from './components/layout/SectionDivider'
@@ -26,6 +27,7 @@ export default async function HomePage() {
     topBills,
     recentNews,
     torontoMpps,
+    budgetSnapshot,
   ] = await Promise.all([
     prisma.bill.count({ where: { toronto_flagged: true } }),
     prisma.bill.count({ where: { status: { notIn: ACTIVE_EXCLUDED } } }),
@@ -48,6 +50,10 @@ export default async function HomePage() {
       orderBy: { name: 'asc' },
       take: 12,
     }),
+    prisma.budgetSnapshot.findFirst({
+      orderBy: { fiscal_year: 'desc' },
+      select: { deficit: true, total_expense: true, fiscal_year: true },
+    }),
   ])
 
   const topBillTitle = topBills[0]?.title
@@ -65,6 +71,10 @@ export default async function HomePage() {
           activeBills={activeBillsCount}
           scandals30d={scandalsCount}
           passedLaws={passedLawsCount}
+          budgetDeficitFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.deficit) : null}
+          budgetTotalSpendFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.total_expense) : null}
+          budgetIsDeficit={budgetSnapshot ? budgetSnapshot.deficit > 0n : false}
+          budgetFiscalYear={budgetSnapshot?.fiscal_year ?? null}
         />
 
         {/* Bills Section */}
