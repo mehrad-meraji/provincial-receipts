@@ -51,7 +51,7 @@ Visitors choose one or more from:
 Two layers:
 
 **Layer 1 — Cloudflare Turnstile (primary)**
-Invisible CAPTCHA widget embedded in the report modal. The widget generates a one-time token the client sends with the report payload. The server verifies the token against `https://challenges.cloudflare.com/turnstile/v0/siteverify` before saving. Failed verification returns `403`.
+Invisible CAPTCHA widget embedded in the report modal. The widget generates a one-time token the client sends with the report payload. The server verifies the token by calling `https://challenges.cloudflare.com/turnstile/v0/siteverify` with the `secret` key and the submitted token. Parse the JSON response body: if `response.success !== true`, return `403`. Failed verification returns `403` before any DB access.
 
 **Layer 2 — Per-IP rate limit (fallback)**
 Before inserting, count `Report` rows with the same `ip` created in the last hour. If count ≥ 5, return `429 Too Many Requests`. The IP is extracted from the `x-forwarded-for` header (Vercel sets this).
@@ -69,7 +69,8 @@ Before inserting, count `Report` rows with the same `ip` created in the last hou
    NEXT_PUBLIC_TURNSTILE_SITE_KEY="your_site_key_here"
    TURNSTILE_SECRET_KEY="your_secret_key_here"
    ```
-6. Install the React wrapper: `pnpm add @marsidev/react-turnstile`
+
+Note: `@marsidev/react-turnstile` is already in the project dependencies.
 
 ---
 
@@ -87,29 +88,41 @@ No authentication. Protected by Turnstile + per-IP rate limit.
   type: 'news' | 'bill'
   targetId: string
   targetTitle: string
-  categories: string[]   // min 1
+  categories: string[]   // min 1 item
   comment?: string
   turnstileToken: string // from widget
 }
 ```
 
 **Logic:**
-1. Verify Turnstile token → 403 on failure
-2. Extract IP from `x-forwarded-for`
-3. Count reports from this IP in last hour → 429 if ≥ 5
-4. Insert `Report` record with `status: 'pending'`
-5. Return `{ ok: true }`
+1. **Validate input** — return `400` if: `type` is not `'news'` or `'bill'`; `targetId` or `targetTitle` are empty strings; `categories` is empty or not an array; `turnstileToken` is absent
+2. **Verify Turnstile** — POST to `https://challenges.cloudflare.com/turnstile/v0/siteverify` with `{ secret: TURNSTILE_SECRET_KEY, response: turnstileToken }`. Parse JSON body; if `data.success !== true`, return `403`
+3. **Extract IP** — from `x-forwarded-for` header (first value)
+4. **Rate limit** — count `Report` rows with the same `ip` in the last hour; if ≥ 5 return `429`
+5. **Insert** — create `Report` record with `status: 'pending'`
+6. Return `{ ok: true }`
 
 ---
 
 ### `GET /api/admin/reports` — Clerk protected
 
-Returns all pending reports ordered by `createdAt desc`. Never returns `ip`.
+Returns pending reports ordered by `createdAt desc`, capped at `take: 200`. Never returns `ip`.
 
 ```ts
-// Response
-Report[] // without ip field
+// Response: ReportItem[]
+{
+  id: string
+  type: string
+  targetId: string
+  targetTitle: string
+  categories: string[]
+  comment: string | null
+  status: string
+  createdAt: string // ISO string
+}[]
 ```
+
+The `ReportItem` type (used by all admin components) is defined as this shape — `ip` is never selected or returned.
 
 ---
 
@@ -126,7 +139,7 @@ Sets `status: 'dismissed'` on the report. No changes to the underlying item.
 
 ### `POST /api/admin/reports/[id]/resolve` — Clerk protected
 
-Applies fix fields to the underlying item then sets `status: 'resolved'`.
+Applies fix fields to the underlying item then sets `status: 'resolved'`. Uses `POST` (consistent with all other admin mutation routes).
 
 **Request body (news):**
 ```ts
@@ -147,7 +160,11 @@ Applies fix fields to the underlying item then sets `status: 'resolved'`.
 }
 ```
 
-Only provided fields are updated. Uses `prisma.newsEvent.update` or `prisma.bill.update` based on report `type`. Returns `{ ok: true }`.
+Only provided fields are updated. Uses `prisma.newsEvent.update` or `prisma.bill.update` based on report `type`.
+
+**Error handling:**
+- If the target item no longer exists (Prisma `P2025`), still set `report.status = 'resolved'` and return `{ ok: true, warning: 'target item no longer exists' }`. The report is cleared from the queue; admin is notified via the response.
+- If a news `url` update hits a unique constraint violation (`P2002`), return `409` with `{ error: 'That URL is already used by another news item' }`. The report status is NOT updated.
 
 ---
 
@@ -158,7 +175,27 @@ Only provided fields are updated. Uses `prisma.newsEvent.update` or `prisma.bill
 { ids: string[], action: 'dismiss' | 'resolve' }
 ```
 
-Bulk-updates `status` on all specified report IDs. For bulk resolve, only the status changes — no item edits (admins who need to fix items use the single resolve modal). Returns `{ ok: true, count: number }`.
+Bulk-updates `status` on all specified report IDs. For bulk resolve, only the status changes — no item edits (to fix specific items, use the single resolve modal). Returns `{ ok: true, count: number }`.
+
+**UI note:** The bulk action button for resolve should be labelled **"mark resolved"** (not "resolve") to clearly distinguish it from the per-item resolve that opens the fix modal.
+
+---
+
+### `GET /api/admin/reports/[id]/target` — Clerk protected
+
+Fetches current editable field values for the target item so `ResolveModal` can pre-fill its form. Called client-side when the resolve modal opens.
+
+**Response (news):**
+```ts
+{ url: string, topic: string | null, is_scandal: boolean, hidden: boolean }
+```
+
+**Response (bill):**
+```ts
+{ url: string | null, status: string, toronto_flagged: boolean }
+```
+
+Determines type by looking up the `Report` by `id`. If report or target not found, returns `404`.
 
 ---
 
@@ -175,9 +212,9 @@ Props: `type`, `targetId`, `targetTitle`, `onClose: () => void`
 Contains:
 - Category checkbox list (multi-select, min 1 required to submit)
 - Optional comment textarea
-- Invisible `<Turnstile>` widget from `@marsidev/react-turnstile` that populates a token on ready
-- Cancel + Submit buttons
-- On submit: POST to `/api/report`, show brief "Thanks for your report" confirmation, then close
+- Invisible `<Turnstile siteKey={NEXT_PUBLIC_TURNSTILE_SITE_KEY} onSuccess={setToken} />` widget from `@marsidev/react-turnstile`
+- Cancel + Submit buttons (submit disabled until at least 1 category selected and Turnstile token is ready)
+- On submit: POST to `/api/report`, show brief "Thanks for your report" confirmation message, then close
 
 ---
 
@@ -185,47 +222,68 @@ Contains:
 
 **`app/admin/components/ReportsPanel.tsx`** — Client component
 Props: `initialReports: ReportItem[]`
+
+`ReportItem` type:
+```ts
+interface ReportItem {
+  id: string
+  type: string
+  targetId: string
+  targetTitle: string
+  categories: string[]
+  comment: string | null
+  status: string
+  createdAt: string // ISO string
+}
+```
+
 Contains:
-- Bulk actions bar: select-all checkbox, "dismiss selected" and "resolve selected" buttons (disabled when nothing selected)
+- Bulk actions bar: select-all checkbox, "dismiss selected" and **"mark resolved"** buttons (disabled when nothing selected)
 - List of report cards, each showing:
   - Checkbox for bulk selection
-  - Type badge (`news` / `bill`), timestamp (relative + absolute)
+  - Type badge (`news` / `bill`), timestamp
   - Item title
   - Category tags
   - Optional comment (italic)
-  - Footer: "dismiss" button, "resolve" button
+  - Footer: "dismiss" button, "resolve" button (opens `ResolveModal`)
 - Optimistic UI: card fades out on action without waiting for server
 
 **`app/admin/components/ResolveModal.tsx`** — Client component
 Props: `report: ReportItem`, `onClose: () => void`, `onResolved: (id: string) => void`
+
+On mount: fetches `GET /api/admin/reports/[report.id]/target` to get current field values for pre-filling the form. Shows a loading state while fetching.
+
 Renders fix fields based on `report.type`:
 
 **News fields:**
-- Source URL (text input, pre-filled with current value)
-- Topic (select: housing / transit / ethics / environment / finance / other)
-- Scandal flag (on/off toggle buttons)
-- Hidden from feed (yes/no toggle buttons)
+- Source URL (text input, pre-filled from target fetch)
+- Topic (select: housing / transit / ethics / environment / finance / other, pre-filled)
+- Scandal flag (on/off toggle buttons, pre-filled)
+- Hidden from feed (yes/no toggle buttons, pre-filled)
 
 **Bill fields:**
 - Source URL (text input, pre-filled)
-- Status (select: standard bill statuses)
-- Toronto flagged (yes/no toggle buttons)
+- Status (select: standard bill statuses, pre-filled)
+- Toronto flagged (yes/no toggle buttons, pre-filled)
 
-Footer: "cancel" + "save & resolve". On save: PATCH resolve route, call `onResolved(report.id)` to remove from list.
+Footer: "cancel" + "save & resolve". On save: POST to `/api/admin/reports/[id]/resolve`, call `onResolved(report.id)` to remove from list. On `409` (URL conflict), show inline error without closing the modal.
 
 ---
 
 ## 6. Integration Points
 
 ### `app/components/news/NewsItem.tsx`
-- Add `ReportButton` props to the `NewsItemProps` interface: `id` is already present
+- Add `'use client'` directive at the top of the file (required because `ReportButton` is a Client Component with state)
+- Add `id` to `NewsItemProps` interface (confirm it is already present; if not, add it)
 - Render `<ReportButton type="news" targetId={item.id} targetTitle={item.headline} />` inline right of the headline row
 
 ### `app/bills/[id]/page.tsx`
 - Render `<ReportButton type="bill" targetId={bill.id} targetTitle={`${bill.bill_number}: ${bill.title}`} />` inline right of the bill title header, alongside the existing "full text" external link button
+- `app/bills/[id]/page.tsx` is already `'use client'` compatible as a Server Component that renders Client Components
 
 ### `app/admin/page.tsx`
-- Add `prisma.report.findMany({ where: { status: 'pending' }, orderBy: { createdAt: 'desc' }, select: { id, type, targetId, targetTitle, categories, comment, status, createdAt } })` to the existing `Promise.all`
+- Add `prisma.report.findMany({ where: { status: 'pending' }, orderBy: { createdAt: 'desc' }, take: 200, select: { id: true, type: true, targetId: true, targetTitle: true, categories: true, comment: true, status: true, createdAt: true } })` to the existing `Promise.all`
+- Serialize `createdAt` before passing to client: `.map(r => ({ ...r, createdAt: r.createdAt.toISOString() }))`
 - Render `<ReportsPanel initialReports={reports} />` as the **first** section (above scandal queue)
 
 ### `prisma/schema.prisma`
@@ -238,7 +296,7 @@ Footer: "cancel" + "save & resolve". On save: PATCH resolve route, call `onResol
 
 ## 7. Deployment
 
-1. Run `pnpm prisma db push` against production Neon DB (or `migrate deploy` once migrations exist)
+1. Run `pnpm prisma db push` against production Neon DB
 2. Add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` to Vercel env vars
 3. Deploy to Vercel
 4. Verify Turnstile widget appears and token is generated in the report modal
