@@ -38,6 +38,7 @@ export default async function HomePage() {
       include: { sponsor_mpp: { select: { party: true, riding: true } } },
     }),
     prisma.newsEvent.findMany({
+      where: { hidden: false },
       orderBy: { published_at: 'desc' },
       take: 20,
     }),
