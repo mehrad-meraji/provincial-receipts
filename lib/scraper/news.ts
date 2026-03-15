@@ -128,6 +128,7 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
       sentiment: 'neutral',
       is_scandal: false,
       tags: [],
+      scandal_review_status: null,
     }
 
     classification = await classifyArticle(headline, excerpt)
@@ -159,6 +160,9 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
           sentiment: classification.sentiment,
           is_scandal: classification.is_scandal,
           tags: classification.tags,
+          excerpt,
+          hidden: false,
+          scandal_review_status: classification.scandal_review_status,
           billId: linkedBill?.id ?? undefined,
         },
       })
