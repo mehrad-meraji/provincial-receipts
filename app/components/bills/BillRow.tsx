@@ -13,6 +13,7 @@ interface BillRowProps {
     toronto_flagged: boolean
     date_introduced: Date | null
     tags: string[]
+    sponsor_mpp?: { party: string; riding: string } | null
   }
 }
 
@@ -36,7 +37,14 @@ export default function BillRow({ bill }: BillRowProps) {
           <span key={tag} className="ml-1 text-xs text-zinc-400 dark:text-zinc-500 font-mono">#{tag}</span>
         ))}
       </td>
-      <td className="px-3 py-3 text-sm text-zinc-600 dark:text-zinc-400 whitespace-nowrap">{bill.sponsor}</td>
+      <td className="px-3 py-3 text-sm text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+        {bill.sponsor}
+        {bill.sponsor_mpp && (
+          <span className="ml-1.5 text-xs font-mono text-zinc-400 dark:text-zinc-500">
+            ({bill.sponsor_mpp.party})
+          </span>
+        )}
+      </td>
       <td className="px-3 py-3"><StatusBadge status={bill.status} /></td>
       <td className="px-3 py-3 text-right"><ImpactScore score={bill.impact_score} flagged={bill.toronto_flagged} /></td>
       <td className="px-3 py-3 text-xs text-zinc-400 dark:text-zinc-500 font-mono whitespace-nowrap hidden sm:table-cell">{dateStr}</td>

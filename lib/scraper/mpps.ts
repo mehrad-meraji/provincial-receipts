@@ -52,15 +52,14 @@ async function fetchMppList(): Promise<MppListRow[]> {
   const $ = cheerio.load(data)
   const rows: MppListRow[] = []
 
-  // TODO: verify selectors against live OLA HTML after first deployment
-  $('.views-row').each((_i, el) => {
+  $('.member-list-row').each((_i, el) => {
     try {
-      const titleEl = $(el).find('h3.views-field-title a')
+      const titleEl = $(el).find('h3')
       const name = titleEl.text().trim()
-      const href = titleEl.attr('href') ?? ''
+      const href = $(el).find('a.mpp-card-link').attr('href') ?? ''
       const fullUrl = href.startsWith('http') ? href : `${OLA_BASE}${href}`
-      const riding = $(el).find('.views-field-field-constituency').text().trim()
-      const party = $(el).find('.views-field-field-caucus').text().trim()
+      const riding = $(el).find('.current-members-riding').text().trim()
+      const party = $(el).find('.current-members-party').text().trim()
 
       if (!name || !href) return // skip malformed rows
 

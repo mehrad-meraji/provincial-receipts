@@ -43,3 +43,43 @@ export async function checkRobotsTxt(baseUrl: string, path: string): Promise<boo
     return true
   }
 }
+
+const PARLIAMENT_CACHE: { number: string; cachedAt: number } | null = null
+const PARLIAMENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+/**
+ * Dynamically detect the current parliament number by scraping the OLA bills page.
+ * Falls back to parliament-44 if detection fails.
+ */
+export async function getCurrentParliament(): Promise<string> {
+  // Note: Using a simple mutable check instead of a cached object
+  // In production, consider using a proper cache or database
+  try {
+    const billsPageUrl = 'https://www.ola.org/en/legislative-business/bills/current'
+    const { data } = await axios.get(billsPageUrl, {
+      headers: buildHeaders(),
+      timeout: 10000,
+    })
+
+    const cheerio = await import('cheerio')
+    const $ = cheerio.load(data)
+
+    // Extract parliament number from first bill link: /parliament-44/session-1/bill-XX
+    const billLink = $('a[href*="/parliament-"][href*="/bill-"]').first().attr('href')
+    if (billLink) {
+      const match = billLink.match(/parliament-(\d+)/)
+      if (match && match[1]) {
+        return `parliament-${match[1]}`
+      }
+    }
+
+    // Fallback to parliament-44
+    return 'parliament-44'
+  } catch (err) {
+    // If detection fails, log and fallback to parliament-44
+    console.warn(
+      `[scraper] Failed to detect current parliament: ${err instanceof Error ? err.message : String(err)}`
+    )
+    return 'parliament-44'
+  }
+}

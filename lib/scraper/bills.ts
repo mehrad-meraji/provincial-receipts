@@ -7,13 +7,13 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { prisma } from '@/lib/db'
-import { buildHeaders, checkRobotsTxt, delay } from './utils'
+import { buildHeaders, checkRobotsTxt, delay, getCurrentParliament } from './utils'
 import { scoreBill } from '@/lib/classifier/score'
 import { loadTaxonomy } from '@/lib/classifier/keywords'
 
 const OLA_BASE = 'https://www.ola.org'
-const OLA_BILLS_PATH =
-  '/en/legislative-business/bills/parliament-44/session-1'
+const OLA_BILLS_PATH_TEMPLATE =
+  '/en/legislative-business/bills/{parliament}/session-1'
 
 export interface BillScrapeResult {
   scraped: number     // bills processed
@@ -52,8 +52,8 @@ interface BillDetail {
 // List-page scraper
 // ---------------------------------------------------------------------------
 
-async function fetchBillList(page: number): Promise<BillListRow[]> {
-  const url = `${OLA_BASE}${OLA_BILLS_PATH}?page=${page}`
+async function fetchBillList(page: number, billsPath: string): Promise<BillListRow[]> {
+  const url = `${OLA_BASE}${billsPath}?page=${page}`
   const { data } = await axios.get<string>(url, {
     headers: buildHeaders(),
     timeout: 20_000,
@@ -229,6 +229,17 @@ async function fetchBillDetail(detailUrl: string): Promise<BillDetail> {
           .filter((t) => t.length > 3)
       )
     }
+
+    // Bill description/summary — provides the richest source of keywords
+    const descriptionText = (
+      $('.field--name-body .field__item').first().text() ||
+      $('.field--name-field-description .field__item').first().text() ||
+      $('.view-bill-detail .field__item').first().text()
+    ).trim()
+    if (descriptionText) {
+      // Use the raw description as one long tag string for keyword matching
+      detail.scraperTags.push(descriptionText.toLowerCase().slice(0, 2000))
+    }
   } catch {
     // Return whatever partial detail was collected — never throw
   }
@@ -241,10 +252,14 @@ async function fetchBillDetail(detailUrl: string): Promise<BillDetail> {
 // ---------------------------------------------------------------------------
 
 export async function scrapeBillsPage(): Promise<BillScrapeResult> {
+  // Detect current parliament dynamically
+  const parliament = await getCurrentParliament()
+  const billsPath = OLA_BILLS_PATH_TEMPLATE.replace('{parliament}', parliament)
+
   // Check robots.txt before any scraping
-  const allowed = await checkRobotsTxt(OLA_BASE, OLA_BILLS_PATH)
+  const allowed = await checkRobotsTxt(OLA_BASE, billsPath)
   if (!allowed) {
-    throw new Error(`robots.txt disallows scraping ${OLA_BILLS_PATH}`)
+    throw new Error(`robots.txt disallows scraping ${billsPath}`)
   }
 
   // Load taxonomy once for the entire batch
@@ -259,7 +274,7 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
   const page = state.last_bill_page + 1 // next page to scrape
 
   // Fetch list page
-  const rows = await fetchBillList(page)
+  const rows = await fetchBillList(page, billsPath)
 
   // Handle end-of-pagination: reset cycle
   if (rows.length === 0) {
@@ -294,6 +309,20 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
         taxonomy
       )
 
+      // Try to find the sponsor MPP for party affiliation linking
+      let sponsorMppId: string | undefined
+      if (row.sponsor) {
+        try {
+          const mpp = await prisma.mPP.findFirst({
+            where: { name: { equals: row.sponsor, mode: 'insensitive' } },
+            select: { id: true },
+          })
+          if (mpp) sponsorMppId = mpp.id
+        } catch {
+          // non-critical — bill still upserted without the link
+        }
+      }
+
       // Upsert bill (keyed on bill_number) with score included
       await prisma.bill.upsert({
         where: { bill_number: row.bill_number },
@@ -311,6 +340,7 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
           tags: scoreResult.tags,
           impact_score: scoreResult.impact_score,
           toronto_flagged: scoreResult.toronto_flagged,
+          sponsorMppId,
         },
         update: {
           title: row.title,
@@ -325,6 +355,7 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
           tags: scoreResult.tags,
           impact_score: scoreResult.impact_score,
           toronto_flagged: scoreResult.toronto_flagged,
+          ...(sponsorMppId ? { sponsorMppId } : {}),
         },
       })
 

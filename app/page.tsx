@@ -35,6 +35,7 @@ export default async function HomePage() {
       where: { toronto_flagged: true },
       orderBy: { impact_score: 'desc' },
       take: 20,
+      include: { sponsor_mpp: { select: { party: true, riding: true } } },
     }),
     prisma.newsEvent.findMany({
       orderBy: { published_at: 'desc' },

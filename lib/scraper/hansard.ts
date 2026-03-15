@@ -6,12 +6,12 @@
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { buildHeaders, checkRobotsTxt, delay } from './utils'
+import { buildHeaders, checkRobotsTxt, delay, getCurrentParliament } from './utils'
 import { STATIC_KEYWORDS } from '@/lib/classifier/keywords'
 
 const OLA_BASE = 'https://www.ola.org'
-const OLA_HANSARD_PATH =
-  '/en/legislative-business/house-documents/parliament-44/session-1'
+const OLA_HANSARD_PATH_TEMPLATE =
+  '/en/legislative-business/house-documents/{parliament}/session-1'
 
 const MAX_DOCUMENTS = 5
 
@@ -48,7 +48,9 @@ interface HansardLink {
 }
 
 async function fetchHansardLinks(): Promise<HansardLink[]> {
-  const listUrl = `${OLA_BASE}${OLA_HANSARD_PATH}`
+  const parliament = await getCurrentParliament()
+  const hansardPath = OLA_HANSARD_PATH_TEMPLATE.replace('{parliament}', parliament)
+  const listUrl = `${OLA_BASE}${hansardPath}`
   const { data } = await axios.get<string>(listUrl, {
     headers: buildHeaders(),
     timeout: 20_000,
@@ -121,10 +123,14 @@ async function fetchHansardDocument(
 // ---------------------------------------------------------------------------
 
 export async function scrapeHansard(): Promise<HansardScrapeResult> {
+  // Detect current parliament dynamically
+  const parliament = await getCurrentParliament()
+  const hansardPath = OLA_HANSARD_PATH_TEMPLATE.replace('{parliament}', parliament)
+
   // Check robots.txt before any scraping
-  const allowed = await checkRobotsTxt(OLA_BASE, OLA_HANSARD_PATH)
+  const allowed = await checkRobotsTxt(OLA_BASE, hansardPath)
   if (!allowed) {
-    throw new Error(`robots.txt disallows scraping ${OLA_HANSARD_PATH}`)
+    throw new Error(`robots.txt disallows scraping ${hansardPath}`)
   }
 
   const links = await fetchHansardLinks()
