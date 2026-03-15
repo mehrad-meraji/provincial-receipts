@@ -44,3 +44,6 @@ next-env.d.ts
 /app/generated/prisma
 # superpowers brainstorm sessions
 .superpowers/
+
+# clerk configuration (can include secrets)
+/.clerk/
