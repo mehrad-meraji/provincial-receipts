@@ -9,7 +9,6 @@ interface KPIStripProps {
   budgetDeficitFormatted: string | null
   budgetTotalSpendFormatted: string | null
   budgetIsDeficit: boolean
-  budgetFiscalYear: string | null
 }
 
 export default function KPIStrip({
@@ -20,7 +19,6 @@ export default function KPIStrip({
   budgetDeficitFormatted,
   budgetTotalSpendFormatted,
   budgetIsDeficit,
-  budgetFiscalYear,
 }: KPIStripProps) {
   const kpis: Array<{ label: string; value: string; danger: boolean; href: string | null }> = [
     { label: 'Toronto Bills', value: String(torontoBills), danger: torontoBills > 10, href: null },

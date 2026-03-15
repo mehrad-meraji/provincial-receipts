@@ -52,7 +52,7 @@ export default async function HomePage() {
     }),
     prisma.budgetSnapshot.findFirst({
       orderBy: { fiscal_year: 'desc' },
-      select: { deficit: true, total_expense: true, fiscal_year: true },
+      select: { deficit: true, total_expense: true },
     }),
   ])
 
@@ -74,7 +74,6 @@ export default async function HomePage() {
           budgetDeficitFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.deficit) : null}
           budgetTotalSpendFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.total_expense) : null}
           budgetIsDeficit={budgetSnapshot ? budgetSnapshot.deficit > 0n : false}
-          budgetFiscalYear={budgetSnapshot?.fiscal_year ?? null}
         />
 
         {/* Bills Section */}
