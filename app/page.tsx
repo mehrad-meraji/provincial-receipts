@@ -31,7 +31,7 @@ export default async function HomePage() {
   ] = await Promise.all([
     prisma.bill.count({ where: { toronto_flagged: true } }),
     prisma.bill.count({ where: { status: { notIn: ACTIVE_EXCLUDED } } }),
-    prisma.newsEvent.count({ where: { is_scandal: true, published_at: { gte: THIRTY_DAYS_AGO } } }),
+    prisma.newsEvent.count({ where: { is_scandal: true, hidden: false, published_at: { gte: THIRTY_DAYS_AGO } } }),
     prisma.bill.count({ where: { status: { in: PASSED_STATUSES } } }),
     prisma.bill.findMany({
       where: { toronto_flagged: true },
@@ -61,7 +61,7 @@ export default async function HomePage() {
   return (
     <main className="min-h-screen">
       <Masthead />
-      <TorontoAlertBanner count={torontoBills} topBillTitle={topBillTitle} />
+      {/*<TorontoAlertBanner count={torontoBills} topBillTitle={topBillTitle} />*/}
       <DatelineBar />
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
