@@ -18,7 +18,7 @@ export interface NewsScrapeResult {
   classified: number  // articles sent to AI
 }
 
-interface PendingItem {
+export interface PendingItem {
   title: string
   link: string
   pubDate?: string
