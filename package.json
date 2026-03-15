@@ -25,7 +25,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "robots-parser": "^3.0.1",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "string-similarity": "^4.0.4"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -33,6 +34,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/string-similarity": "^4.0.2",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",

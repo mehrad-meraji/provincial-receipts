@@ -1,5 +1,6 @@
 import robotsParser from 'robots-parser'
 import axios from 'axios'
+import stringSimilarity from 'string-similarity'
 
 export const USER_AGENT =
   'FuckDougFord/1.0 (civic transparency project; contact@YOUR_EMAIL.com)'
@@ -82,4 +83,24 @@ export async function getCurrentParliament(): Promise<string> {
     )
     return 'parliament-44'
   }
+}
+
+/**
+ * Deduplicate articles based on content similarity.
+ * @param articles Array of PendingItem
+ * @param threshold Similarity threshold (0.9 = 90%)
+ * @returns Deduped array
+ */
+export function dedupeArticlesBySimilarity(articles: Array<{ title: string; contentSnippet: string; content: string; link: string; sourceName: string }>, threshold = 0.9) {
+  const deduped: typeof articles = []
+  for (const article of articles) {
+    const textA = `${article.title} ${article.contentSnippet} ${article.content}`.toLowerCase().replace(/[^a-z0-9 ]/g, '')
+    const isDuplicate = deduped.some((other) => {
+      const textB = `${other.title} ${other.contentSnippet} ${other.content}`.toLowerCase().replace(/[^a-z0-9 ]/g, '')
+      const similarity = stringSimilarity.compareTwoStrings(textA, textB)
+      return similarity >= threshold
+    })
+    if (!isDuplicate) deduped.push(article)
+  }
+  return deduped
 }

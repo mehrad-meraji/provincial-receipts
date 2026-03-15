@@ -91,23 +91,22 @@ export default async function HomePage() {
           </section>
 
           {/* Toronto MPPs - narrower column */}
-          <section>
-            <SectionDivider label="Toronto Area MPPs" />
-            <div className="grid grid-cols-1 gap-2">
-              {torontoMpps.map((mpp: MPP & { _count: { bills: number } }) => (
-                <MPPCard
-                  key={mpp.id}
-                  mpp={{
-                    ...mpp,
-                    _count: { bills: mpp._count.bills },
-                  }}
-                />
-              ))}
-              {torontoMpps.length === 0 && (
-                <p className="text-sm text-zinc-400 font-mono">Run the MPP scraper to populate data.</p>
-              )}
-            </div>
-          </section>
+          { torontoMpps.length > 0 && (
+            <section>
+              <SectionDivider label="Toronto Area MPPs" />
+              <div className="grid grid-cols-1 gap-2">
+                {torontoMpps.map((mpp: MPP & { _count: { bills: number } }) => (
+                  <MPPCard
+                    key={mpp.id}
+                    mpp={{
+                      ...mpp,
+                      _count: { bills: mpp._count.bills },
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 

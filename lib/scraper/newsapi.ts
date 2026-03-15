@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 import type { PendingItem } from './news'
+import { dedupeArticlesBySimilarity } from './utils'
 
 const NEWSAPI_URL = 'https://newsapi.org/v2/everything'
 const NEWSAPI_QUERY = 'ontario OR "doug ford" OR "queen\'s park" OR "ontario legislature"'
@@ -38,7 +39,7 @@ export async function fetchNewsApiArticles(): Promise<PendingItem[]> {
 
     await clearBackoff(SOURCE_ID)
 
-    return (data.articles ?? [])
+    const articles = (data.articles ?? [])
       .filter((a: { url?: string }) => !!a.url)
       .map((a: { title?: string; url: string; publishedAt?: string; description?: string; content?: string; source?: { name?: string } }) => ({
         title: a.title ?? '',
@@ -46,8 +47,11 @@ export async function fetchNewsApiArticles(): Promise<PendingItem[]> {
         pubDate: a.publishedAt,
         contentSnippet: a.description ?? '',
         content: a.content ?? '',
-        sourceName: `NewsAPI: ${a.source?.name ?? 'Unknown'}`,
+        sourceName: `${a.source?.name ?? 'Unknown'}`,
       }))
+
+    // Deduplicate by content similarity (threshold 0.9)
+    return dedupeArticlesBySimilarity(articles, 0.9)
   } catch (err) {
     console.warn(
       `[scraper/newsapi] fetch failed: ${err instanceof Error ? err.message : String(err)}`

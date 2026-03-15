@@ -28,7 +28,8 @@ interface AISuggestion {
   category: 'direct' | 'toronto_flashpoints' | 'housing' | 'transit' | 'municipal'
 }
 
-export async function discoverKeywords(): Promise<KeywordDiscoveryResult> {
+export async function discoverKeywords(retryCount = 0): Promise<KeywordDiscoveryResult> {
+  const MAX_RETRIES = 3
   // 1. Fetch last 50 bills from DB
   const bills = await prisma.bill.findMany({
     take: 50,
@@ -44,26 +45,14 @@ export async function discoverKeywords(): Promise<KeywordDiscoveryResult> {
   const existingTerms = existingSuggestions.map((s) => s.term)
 
   // 3. Build prompt and call AI
-  const prompt = `You are helping track Ontario government bills that affect Toronto.
-
-Here are recent Ontario bills (bill_number, title, tags):
-${JSON.stringify(bills)}
-
-Existing tracked keywords (do not re-suggest): ${existingTerms.join(', ')}
-
-Suggest up to 10 new search terms that would identify bills affecting Toronto residents.
-Focus on: place names, policy areas, infrastructure, local government powers.
-
-Return valid JSON only:
-{ "suggestions": [{ "term": string, "weight": 1|2|3|4, "category": "direct"|"toronto_flashpoints"|"housing"|"transit"|"municipal" }] }`
+  const prompt = `You are helping track Ontario government bills that affect Toronto.\n\nHere are recent Ontario bills (bill_number, title, tags):\n${JSON.stringify(bills)}\n\nExisting tracked keywords (do not re-suggest): ${existingTerms.join(', ')}\n\nSuggest up to 10 new search terms that would identify bills affecting Toronto residents.\nFocus on: place names, policy areas, infrastructure, local government powers.\n\nReturn valid JSON only:\n{ "suggestions": [{ "term": string, "weight": 1|2|3|4, "category": "direct"|"toronto_flashpoints"|"housing"|"transit"|"municipal" }] }`
 
   let aiSuggestions: AISuggestion[] = []
   try {
     const response = await getClient().chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-      max_tokens: 500,
+      max_completion_tokens: 500,
     })
     const raw = response.choices[0]?.message?.content ?? ''
     try {
@@ -74,6 +63,14 @@ Return valid JSON only:
       return { suggested: 0, promoted: 0, newSuggestions: 0 }
     }
   } catch (err) {
+    // Rate limit handling
+    const error = err as { status?: number; headers?: Record<string, string> }
+    if (error?.status === 429 && retryCount < MAX_RETRIES) {
+      const retryAfter = parseInt(error?.headers?.['retry-after'] ?? '60', 10)
+      console.warn(`[discover] Rate limit hit, retrying after ${retryAfter}s (attempt ${retryCount + 1})`)
+      await new Promise(res => setTimeout(res, retryAfter * 1000))
+      return discoverKeywords(retryCount + 1)
+    }
     console.error('[discover] AI call failed:', err)
     return { suggested: 0, promoted: 0, newSuggestions: 0 }
   }

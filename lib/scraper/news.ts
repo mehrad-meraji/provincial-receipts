@@ -4,12 +4,9 @@
 // records. Caps at 25 new articles per invocation to stay within Vercel's
 // 60s function timeout.
 
-import Parser from 'rss-parser'
 import { classifyArticle, extractBillNumber, type ArticleClassification } from '@/lib/ai/classify'
 import { prisma } from '@/lib/db'
 import { delay } from './utils'
-import { RSS_SOURCES } from './rss-sources'
-import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 import { fetchNewsApiArticles } from './newsapi'
 
 const MAX_NEW_ARTICLES = 25
@@ -34,57 +31,16 @@ export interface PendingItem {
 // ---------------------------------------------------------------------------
 
 export async function scrapeNews(): Promise<NewsScrapeResult> {
-  // Note: robots.txt is not checked here because RSS feeds are explicitly
-  // designed for programmatic consumption — providing a feed is an implicit
-  // invitation for automated readers.
-  const parser = new Parser()
-
   let fetched = 0
   let stored = 0
   let classified = 0
 
   const allCandidates: PendingItem[] = []
 
-  // --- NewsAPI (runs first, fills initial candidates) ---
+  // --- NewsAPI only ---
   const newsApiArticles = await fetchNewsApiArticles()
   allCandidates.push(...newsApiArticles)
   fetched += newsApiArticles.length
-
-  // --- RSS feeds (fill remaining capacity) ---
-  for (const source of RSS_SOURCES) {
-    if (allCandidates.length >= MAX_NEW_ARTICLES) break
-
-    if (await isBackedOff(source.id)) {
-      console.warn(`[scraper/news] ${source.name} backed off, skipping`)
-      continue
-    }
-
-    try {
-      const feed = await parser.parseURL(source.url)
-      await clearBackoff(source.id)
-
-      for (const item of feed.items ?? []) {
-        if (allCandidates.length >= MAX_NEW_ARTICLES) break
-        fetched++
-        const url = item.link ?? ''
-        if (!url) continue
-        allCandidates.push({
-          title: item.title ?? '',
-          link: url,
-          pubDate: item.pubDate,
-          contentSnippet: item.contentSnippet,
-          content: item.content,
-          sourceName: source.name,
-        })
-      }
-    } catch (err) {
-      const msg = String(err)
-      if (msg.includes('Status code 429')) {
-        await setBackoff(source.id, msg)
-      }
-      console.warn(`[scraper/news] Failed to parse feed ${source.url}: ${msg}`)
-    }
-  }
 
   // Batch duplicate check: one query for all candidate URLs
   const allUrls = allCandidates.map((c) => c.link)
@@ -120,9 +76,6 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
     }
 
     // Classify the article via AI.
-    // classifyArticle() handles its own errors internally and always returns a
-    // result, so we increment classified unconditionally to reflect every
-    // article where AI classification was attempted.
     let classification: ArticleClassification = {
       topic: 'other',
       sentiment: 'neutral',

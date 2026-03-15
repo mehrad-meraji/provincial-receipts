@@ -74,14 +74,15 @@ Return valid JSON only, no prose:
 
 export async function classifyArticle(
   headline: string,
-  excerpt: string
+  excerpt: string,
+  retryCount = 0
 ): Promise<ArticleClassification> {
+  const MAX_RETRIES = 3
   try {
     const response = await getClient().chat.completions.create({
       model: AI_MODEL,
       messages: [{ role: 'user', content: PROMPT_TEMPLATE(headline, excerpt) }],
-      temperature: 0,
-      max_tokens: 200,
+      max_completion_tokens: 200,
     })
     const raw = response.choices[0]?.message?.content ?? ''
     const result = parseClassification(raw)
@@ -92,7 +93,14 @@ export async function classifyArticle(
       return { ...result, is_scandal: false, scandal_review_status: 'pending' }
     }
     return { ...result, scandal_review_status: null }
-  } catch (err) {
+  } catch (err: any) {
+    // Rate limit handling
+    if (err?.status === 429 && retryCount < MAX_RETRIES) {
+      const retryAfter = parseInt(err?.headers?.['retry-after'] ?? '60', 10)
+      console.warn(`[classify] Rate limit hit, retrying after ${retryAfter}s (attempt ${retryCount + 1})`)
+      await new Promise(res => setTimeout(res, retryAfter * 1000))
+      return classifyArticle(headline, excerpt, retryCount + 1)
+    }
     console.error('[classify] AI call failed:', err)
     return { ...DEFAULTS }
   }
