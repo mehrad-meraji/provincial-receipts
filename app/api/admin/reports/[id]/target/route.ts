@@ -26,7 +26,7 @@ export async function GET(
   if (report.type === 'bill') {
     const item = await prisma.bill.findUnique({
       where: { id: report.targetId },
-      select: { url: true, status: true, toronto_flagged: true },
+      select: { url: true, status: true },
     })
     if (!item) return NextResponse.json({ error: 'Target not found' }, { status: 404 })
     return NextResponse.json(item)

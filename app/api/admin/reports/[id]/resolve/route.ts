@@ -36,15 +36,13 @@ export async function POST(
         await prisma.newsEvent.update({ where: { id: report.targetId }, data })
       }
     } else if (report.type === 'bill') {
-      const { url, status: billStatus, toronto_flagged } = body as {
+      const { url, status: billStatus } = body as {
         url?: string
         status?: string
-        toronto_flagged?: boolean
       }
       const data: Record<string, unknown> = {}
       if (url !== undefined) data.url = url
       if (billStatus !== undefined) data.status = billStatus
-      if (toronto_flagged !== undefined) data.toronto_flagged = toronto_flagged
 
       if (Object.keys(data).length > 0) {
         await prisma.bill.update({ where: { id: report.targetId }, data })
