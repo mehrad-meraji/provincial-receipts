@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 
 interface NewsItem {
   id: string
@@ -16,6 +16,13 @@ export default function NewsFeedOverride({ initialItems }: { initialItems: NewsI
   const [items, setItems] = useState(initialItems)
   const [loading, setLoading] = useState<string | null>(null)
   const [showHidden, setShowHidden] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [formLoading, setFormLoading] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+  const [formUrl, setFormUrl] = useState('')
+  const [formHeadline, setFormHeadline] = useState('')
+  const [formSource, setFormSource] = useState('')
+  const [formIsScandal, setFormIsScandal] = useState(false)
 
   async function toggleHidden(id: string, hidden: boolean) {
     setLoading(id)
@@ -42,6 +49,38 @@ export default function NewsFeedOverride({ initialItems }: { initialItems: NewsI
       setItems(prev => prev.map(item => item.id === id ? { ...item, is_scandal: !wasScandal } : item))
     } finally {
       setLoading(null)
+    }
+  }
+
+  async function submitNewItem(e: FormEvent) {
+    e.preventDefault()
+    setFormLoading(true)
+    setFormError(null)
+    try {
+      let res: Response
+      try {
+        res = await fetch('/api/admin/news-add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ headline: formHeadline, url: formUrl, source: formSource, is_scandal: formIsScandal }),
+        })
+      } catch {
+        setFormError('Network error — please try again')
+        return
+      }
+      const data = await res.json()
+      if (!res.ok) {
+        setFormError(data.error ?? 'Something went wrong')
+        return
+      }
+      setItems(prev => [data, ...prev])
+      setFormUrl('')
+      setFormHeadline('')
+      setFormSource('')
+      setFormIsScandal(false)
+      setShowForm(false)
+    } finally {
+      setFormLoading(false)
     }
   }
 
@@ -84,6 +123,60 @@ export default function NewsFeedOverride({ initialItems }: { initialItems: NewsI
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={() => { setShowForm(v => !v); setFormError(null) }}
+          className="text-xs font-mono text-zinc-400 hover:text-zinc-600"
+        >
+          {showForm ? '✕ Cancel' : '＋ Add article'}
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={submitNewItem} className="space-y-2 border border-zinc-200 dark:border-zinc-700 rounded p-3">
+          <input
+            type="url"
+            placeholder="URL"
+            value={formUrl}
+            onChange={e => setFormUrl(e.target.value)}
+            required
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 bg-transparent"
+          />
+          <input
+            type="text"
+            placeholder="Headline"
+            value={formHeadline}
+            onChange={e => setFormHeadline(e.target.value)}
+            required
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 bg-transparent"
+          />
+          <input
+            type="text"
+            placeholder="Source"
+            value={formSource}
+            onChange={e => setFormSource(e.target.value)}
+            required
+            className="w-full text-sm border border-zinc-200 dark:border-zinc-700 rounded px-2 py-1 bg-transparent"
+          />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={formIsScandal}
+              onChange={e => setFormIsScandal(e.target.checked)}
+            />
+            Scandal?
+          </label>
+          {formError && <p className="text-xs text-red-500">{formError}</p>}
+          <button
+            type="submit"
+            disabled={formLoading}
+            className="px-3 py-1 text-xs bg-zinc-800 text-white rounded hover:bg-zinc-700 disabled:opacity-50"
+          >
+            {formLoading ? 'Adding…' : 'Add'}
+          </button>
+        </form>
+      )}
+
       <div>{visible.map(renderItem)}</div>
       {hidden.length > 0 && (
         <div>
