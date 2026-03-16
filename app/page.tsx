@@ -34,7 +34,7 @@ export default async function HomePage() {
     prisma.newsEvent.count({ where: { is_scandal: true, hidden: false, published_at: { gte: THIRTY_DAYS_AGO } } }),
     prisma.bill.count({ where: { status: { in: PASSED_STATUSES } } }),
     prisma.bill.findMany({
-      where: { toronto_flagged: true },
+      where: { published: true },
       orderBy: { impact_score: 'desc' },
       take: 20,
       include: { sponsor_mpp: { select: { party: true, riding: true } } },
