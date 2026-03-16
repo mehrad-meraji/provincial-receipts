@@ -355,6 +355,7 @@ export async function scrapeBillsPage(): Promise<BillScrapeResult> {
           tags: scoreResult.tags,
           impact_score: scoreResult.impact_score,
           toronto_flagged: scoreResult.toronto_flagged,
+          ...(scoreResult.toronto_flagged ? { published: true } : {}),
           sponsorMppId,
         },
         update: {
