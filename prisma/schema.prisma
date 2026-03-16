@@ -20,6 +20,7 @@ model Bill {
   impact_score    Float       @default(0)
   tags            String[]
   toronto_flagged Boolean     @default(false)
+  published       Boolean     @default(false)
   last_scraped    DateTime    @default(now())
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
