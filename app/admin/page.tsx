@@ -2,6 +2,7 @@ import { prisma } from '@/lib/db'
 import ReportsPanel from './components/ReportsPanel'
 import ScandalQueue from './components/ScandalQueue'
 import NewsFeedOverride from './components/NewsFeedOverride'
+import BillsPanel from './components/BillsPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,7 +72,7 @@ export default async function AdminPage() {
         <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
           Bills
         </h2>
-        <div>Bills panel coming soon</div>
+        <BillsPanel />
       </section>
     </main>
   )
