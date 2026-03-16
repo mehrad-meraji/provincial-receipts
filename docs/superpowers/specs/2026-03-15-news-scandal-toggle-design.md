@@ -30,27 +30,37 @@ select: { id, headline, url, source, published_at, hidden, is_scandal }
 1. Add `is_scandal: boolean` to the `NewsItem` interface.
 2. Add a `toggleScandal(id, is_scandal)` async function that calls `POST /api/admin/scandal-review` with `action: 'confirm'` (mark) or `action: 'reject'` (unmark), then updates local state optimistically.
 3. Render a second button per row alongside the Hide/Unhide button:
-   - When `is_scandal: true` — label "Unscandal", style `bg-ontario-red text-white`
-   - When `is_scandal: false` — label "Scandal", style `bg-zinc-200 dark:bg-zinc-700`
+   - When `is_scandal: true` — label "Unscandal", style `bg-ontario-red text-white hover:bg-red-700 disabled:opacity-50`
+   - When `is_scandal: false` — label "Scandal", style `bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600 disabled:opacity-50`
 4. Both buttons are disabled while `loading === item.id` (existing pattern).
 
 ## Data Flow
 
 ```
-Admin clicks "Scandal"
-  → toggleScandal(id, false)
+Admin clicks "Scandal" (wasScandal=false)
+  → toggleScandal(id, wasScandal=false)
   → POST /api/admin/scandal-review { id, action: 'confirm' }
   → DB: is_scandal=true, scandal_review_status='confirmed'
   → local state: item.is_scandal = true
   → button switches to "Unscandal" (red)
 
-Admin clicks "Unscandal"
-  → toggleScandal(id, true)
+Admin clicks "Unscandal" (wasScandal=true)
+  → toggleScandal(id, wasScandal=true)
   → POST /api/admin/scandal-review { id, action: 'reject' }
   → DB: is_scandal=false, scandal_review_status='rejected'
   → local state: item.is_scandal = false
   → button switches to "Scandal" (neutral)
 ```
+
+## Known Limitations / Accepted Trade-offs
+
+**Authorization:** The existing `/api/admin/scandal-review` route only checks `userId` (Clerk), not an admin role. This is a pre-existing gap across all admin routes and is out of scope for this feature.
+
+**Error handling:** `toggleScandal` follows the same pattern as `toggleHidden` — no optimistic rollback on failure. If the request fails, the button state may be momentarily out of sync until the next full page load. Accepted as-is, consistent with the rest of the admin UI.
+
+**`scandal_review_status` side effect:** Calling `action: 'reject'` to unmark a manually-set scandal will write `scandal_review_status: 'rejected'` even on items the AI never classified. This is intentional — it makes the item queryable and doesn't block the AI queue (the queue filters for `'pending'`, not `null`). AI can still re-classify these items in the future if it encounters them.
+
+**Hidden + scandal items:** An item can be both hidden and marked as a scandal. This is a valid admin state (e.g., hide from the public feed but track internally). The `ScandalQueue` does not filter by `hidden`, so a hidden scandal will appear there. No special UX is added for this case.
 
 ## No-ops / Out of Scope
 
