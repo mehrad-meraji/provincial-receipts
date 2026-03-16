@@ -2,12 +2,11 @@ import { prisma } from '@/lib/db'
 import ReportsPanel from './components/ReportsPanel'
 import ScandalQueue from './components/ScandalQueue'
 import NewsFeedOverride from './components/NewsFeedOverride'
-import BillsOverride from './components/BillsOverride'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const [reports, pendingScandals, recentNews, flaggedBills] = await Promise.all([
+  const [reports, pendingScandals, recentNews] = await Promise.all([
     prisma.report.findMany({
       where: { status: 'pending' },
       orderBy: { createdAt: 'desc' },
@@ -32,11 +31,6 @@ export default async function AdminPage() {
       orderBy: { published_at: 'desc' },
       take: 50,
       select: { id: true, headline: true, url: true, source: true, published_at: true, hidden: true, is_scandal: true },
-    }),
-    prisma.bill.findMany({
-      where: { toronto_flagged: true },
-      orderBy: { impact_score: 'desc' },
-      select: { id: true, bill_number: true, title: true, sponsor: true, status: true },
     }),
   ])
 
@@ -75,9 +69,9 @@ export default async function AdminPage() {
 
       <section>
         <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
-          Toronto Bills Override
+          Bills
         </h2>
-        <BillsOverride flaggedBills={flaggedBills} />
+        <div>Bills panel coming soon</div>
       </section>
     </main>
   )
