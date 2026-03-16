@@ -24,7 +24,6 @@ interface TargetNews {
 interface TargetBill {
   url: string
   status: string
-  toronto_flagged: boolean
 }
 
 interface Props {
@@ -163,20 +162,6 @@ export default function ResolveModal({ report, onClose, onResolved }: Props) {
               >
                 {BILL_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-mono text-zinc-500 mb-1">Toronto flagged</label>
-              <div className="flex gap-2">
-                {[true, false].map(v => (
-                  <button
-                    key={String(v)}
-                    onClick={() => setBillFields(f => f && ({ ...f, toronto_flagged: v }))}
-                    className={`px-3 py-1 text-xs font-mono rounded border ${billFields.toronto_flagged === v ? 'bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 border-zinc-900 dark:border-white' : 'border-zinc-300 dark:border-zinc-600'}`}
-                  >
-                    {v ? 'yes' : 'no'}
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         )}
