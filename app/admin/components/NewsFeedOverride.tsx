@@ -9,6 +9,7 @@ interface NewsItem {
   source: string
   published_at: string
   hidden: boolean
+  is_scandal: boolean
 }
 
 export default function NewsFeedOverride({ initialItems }: { initialItems: NewsItem[] }) {
@@ -30,6 +31,20 @@ export default function NewsFeedOverride({ initialItems }: { initialItems: NewsI
     }
   }
 
+  async function toggleScandal(id: string, wasScandal: boolean) {
+    setLoading(id)
+    try {
+      await fetch('/api/admin/scandal-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: wasScandal ? 'reject' : 'confirm' }),
+      })
+      setItems(prev => prev.map(item => item.id === id ? { ...item, is_scandal: !wasScandal } : item))
+    } finally {
+      setLoading(null)
+    }
+  }
+
   const visible = items.filter(i => !i.hidden)
   const hidden = items.filter(i => i.hidden)
 
@@ -45,6 +60,17 @@ export default function NewsFeedOverride({ initialItems }: { initialItems: NewsI
             {item.source} · {new Date(item.published_at).toLocaleDateString('en-CA')}
           </p>
         </div>
+        <button
+          onClick={() => toggleScandal(item.id, item.is_scandal)}
+          disabled={loading === item.id}
+          className={
+            item.is_scandal
+              ? 'px-3 py-1 text-xs shrink-0 bg-ontario-red text-white rounded hover:bg-red-700 disabled:opacity-50'
+              : 'px-3 py-1 text-xs shrink-0 bg-zinc-200 dark:bg-zinc-700 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600 disabled:opacity-50'
+          }
+        >
+          {item.is_scandal ? 'Unscandal' : 'Scandal'}
+        </button>
         <button
           onClick={() => toggleHidden(item.id, !item.hidden)}
           disabled={loading === item.id}
