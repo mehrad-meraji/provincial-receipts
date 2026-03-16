@@ -116,6 +116,20 @@ it('applies search query (case-insensitive) to bill_number and title', async () 
   ])
 })
 
+it('combines filter and search query (AND behavior)', async () => {
+  mockPrisma.bill.findMany.mockResolvedValueOnce([])
+  mockPrisma.bill.count.mockResolvedValueOnce(0)
+  await GET(makeRequest({ filter: 'published', q: 'housing' }))
+  const call = mockPrisma.bill.findMany.mock.calls[0][0]
+  expect(call.where).toMatchObject({
+    published: true,
+    OR: [
+      { bill_number: { contains: 'housing', mode: 'insensitive' } },
+      { title: { contains: 'housing', mode: 'insensitive' } },
+    ],
+  })
+})
+
 it('treats unknown filter as all (no filter)', async () => {
   mockPrisma.bill.findMany.mockResolvedValueOnce([])
   mockPrisma.bill.count.mockResolvedValueOnce(0)

@@ -51,6 +51,11 @@ it('returns 400 when action is invalid', async () => {
   expect(res.status).toBe(400)
 })
 
+it('returns 400 when tag is missing', async () => {
+  const res = await POST(makeRequest({ id: 'b1', action: 'remove' }))
+  expect(res.status).toBe(400)
+})
+
 it('returns 400 when adding an invalid tag', async () => {
   const res = await POST(makeRequest({ id: 'b1', tag: 'invalid-tag', action: 'add' }))
   expect(res.status).toBe(400)

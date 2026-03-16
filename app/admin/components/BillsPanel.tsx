@@ -41,6 +41,7 @@ export default function BillsPanel() {
   const [loading, setLoading] = useState(false)
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null)
   const [tagLoading, setTagLoading] = useState(false)
+  const [publishLoading, setPublishLoading] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const drawerOpen = useRef(false)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -124,11 +125,12 @@ export default function BillsPanel() {
   }
 
   async function handlePublishToggle() {
-    if (!selectedBill) return
+    if (!selectedBill || publishLoading) return
     const prevPublished = selectedBill.published
     const nextPublished = !prevPublished
     setSelectedBill(b => b ? { ...b, published: nextPublished } : null)
     setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: nextPublished } : b))
+    setPublishLoading(true)
     try {
       const res = await fetch('/api/admin/bill-publish', {
         method: 'POST',
@@ -136,9 +138,7 @@ export default function BillsPanel() {
         body: JSON.stringify({ id: selectedBill.id, published: nextPublished }),
       })
       if (!res.ok) {
-        // Always revert the table row
         setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: prevPublished } : b))
-        // Only revert drawer and show toast if drawer is still open
         if (drawerOpen.current) {
           showToast('Failed to update visibility')
           setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
@@ -150,13 +150,13 @@ export default function BillsPanel() {
       setSelectedBill(b => b ? { ...b, published: data.published } : null)
       setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: data.published } : b))
     } catch {
-      // Always revert the table row
       setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: prevPublished } : b))
-      // Only revert drawer and show toast if drawer is still open
       if (drawerOpen.current) {
         showToast('Failed to update visibility')
         setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
       }
+    } finally {
+      setPublishLoading(false)
     }
   }
 
@@ -384,7 +384,8 @@ export default function BillsPanel() {
                   {/* Toggle switch */}
                   <button
                     onClick={handlePublishToggle}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${selectedBill.published ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
+                    disabled={publishLoading}
+                    className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${selectedBill.published ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
                   >
                     <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${selectedBill.published ? 'translate-x-5' : 'translate-x-0.5'}`} />
                   </button>
