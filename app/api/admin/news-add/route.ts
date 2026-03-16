@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     is_scandal?: unknown
   }
 
-  if (!headline || !url || !source) {
+  if (!headline?.trim() || !url?.trim() || !source?.trim()) {
     return NextResponse.json({ error: 'headline, url, and source are required' }, { status: 400 })
   }
 

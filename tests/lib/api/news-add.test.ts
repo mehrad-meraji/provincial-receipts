@@ -57,6 +57,11 @@ it('returns 400 when is_scandal is not a boolean', async () => {
   expect(res.status).toBe(400)
 })
 
+it('returns 400 when is_scandal is omitted', async () => {
+  const res = await POST(makeRequest({ headline: 'h', url: 'https://example.com', source: 's' }))
+  expect(res.status).toBe(400)
+})
+
 it('returns 400 when url is not a valid URL', async () => {
   const res = await POST(makeRequest({ headline: 'h', url: 'not-a-url', source: 's', is_scandal: false }))
   expect(res.status).toBe(400)
