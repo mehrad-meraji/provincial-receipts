@@ -31,7 +31,7 @@ export default async function AdminPage() {
     prisma.newsEvent.findMany({
       orderBy: { published_at: 'desc' },
       take: 50,
-      select: { id: true, headline: true, url: true, source: true, published_at: true, hidden: true },
+      select: { id: true, headline: true, url: true, source: true, published_at: true, hidden: true, is_scandal: true },
     }),
     prisma.bill.findMany({
       where: { toronto_flagged: true },
