@@ -157,7 +157,7 @@ it('uses correct sort order', async () => {
   await GET(makeRequest())
   const call = mockPrisma.bill.findMany.mock.calls[0][0]
   expect(call.orderBy).toEqual([
-    { date_introduced: 'desc' },
+    { date_introduced: { sort: 'desc', nulls: 'last' } },
     { id: 'asc' },
   ])
 })

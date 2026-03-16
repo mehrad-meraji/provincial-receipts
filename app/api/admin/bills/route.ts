@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const [bills, total] = await Promise.all([
     prisma.bill.findMany({
       where,
-      orderBy: [{ date_introduced: 'desc' }, { id: 'asc' }],
+      orderBy: [{ date_introduced: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
       select: {

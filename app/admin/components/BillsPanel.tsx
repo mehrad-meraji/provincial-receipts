@@ -135,21 +135,28 @@ export default function BillsPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: selectedBill.id, published: nextPublished }),
       })
-      if (!drawerOpen.current) return
       if (!res.ok) {
-        showToast('Failed to update visibility')
-        setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
+        // Always revert the table row
         setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: prevPublished } : b))
+        // Only revert drawer and show toast if drawer is still open
+        if (drawerOpen.current) {
+          showToast('Failed to update visibility')
+          setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
+        }
         return
       }
+      if (!drawerOpen.current) return
       const data = await res.json()
       setSelectedBill(b => b ? { ...b, published: data.published } : null)
       setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: data.published } : b))
     } catch {
-      if (!drawerOpen.current) return
-      showToast('Failed to update visibility')
-      setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
+      // Always revert the table row
       setBills(bs => bs.map(b => b.id === selectedBill.id ? { ...b, published: prevPublished } : b))
+      // Only revert drawer and show toast if drawer is still open
+      if (drawerOpen.current) {
+        showToast('Failed to update visibility')
+        setSelectedBill(b => b ? { ...b, published: prevPublished } : null)
+      }
     }
   }
 
