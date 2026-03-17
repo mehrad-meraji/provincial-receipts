@@ -12,6 +12,7 @@ interface LegalAction {
   title: string
   status: string
   description: string
+  url?: string
 }
 
 interface BillChip {
@@ -47,6 +48,7 @@ interface ScandalDetail {
   id: string
   title: string
   slug: string
+  tldr: string | null
   summary: string | null
   date_reported: string
   published: boolean
@@ -218,6 +220,7 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
 
   // Basic fields
   const [title, setTitle] = useState('')
+  const [tldr, setTldr] = useState('')
   const [summary, setSummary] = useState('')
   const [dateReported, setDateReported] = useState(
     new Date().toISOString().slice(0, 10)
@@ -272,6 +275,7 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
       .then(r => r.json())
       .then((data: ScandalDetail) => {
         setTitle(data.title)
+        setTldr(data.tldr ?? '')
         setSummary(data.summary ?? '')
         setDateReported(data.date_reported.slice(0, 10))
         setPublished(data.published)
@@ -386,6 +390,7 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
     try {
       const payload = {
         title,
+        tldr,
         summary,
         date_reported: dateReported,
         published,
@@ -495,6 +500,17 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
             </div>
 
             <div>
+              <Label>TL;DR</Label>
+              <textarea
+                value={tldr}
+                onChange={e => setTldr(e.target.value)}
+                rows={2}
+                className={`${inputCls} resize-y`}
+                placeholder="One or two sentences — the plain-English punchline…"
+              />
+            </div>
+
+            <div>
               <Label>Summary</Label>
               <textarea
                 value={summary}
@@ -572,7 +588,7 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
                 onClick={() =>
                   setLegalActions(prev => [
                     ...prev,
-                    { title: '', status: 'pending', description: '' },
+                    { title: '', status: 'pending', description: '', url: '' },
                   ])
                 }
                 className="flex items-center gap-1 text-xs font-mono text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
@@ -643,6 +659,20 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
                     rows={2}
                     className={`${inputCls} resize-y`}
                     placeholder="Describe the legal action…"
+                  />
+                </div>
+                <div>
+                  <Label>Source URL (optional)</Label>
+                  <input
+                    type="url"
+                    value={la.url ?? ''}
+                    onChange={e =>
+                      setLegalActions(prev =>
+                        prev.map((x, j) => j === i ? { ...x, url: e.target.value } : x)
+                      )
+                    }
+                    className={inputCls}
+                    placeholder="https://court-record or news link…"
                   />
                 </div>
               </div>

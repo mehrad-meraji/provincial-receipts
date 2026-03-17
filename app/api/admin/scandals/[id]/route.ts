@@ -46,6 +46,7 @@ export async function PUT(
   const body = await req.json()
   const {
     title,
+    tldr = '',
     summary,
     date_reported,
     published,
@@ -58,12 +59,13 @@ export async function PUT(
     sources = [],
   } = body as {
     title: string
+    tldr: string
     summary: string
     date_reported: string
     published: boolean
     why_it_matters: string
     rippling_effects: string
-    legal_actions: { title: string; status: string; description: string }[]
+    legal_actions: { title: string; status: string; description: string; url?: string }[]
     bill_ids: string[]
     mpp_ids: string[]
     news_links: {
@@ -97,6 +99,7 @@ export async function PUT(
       where: { id },
       data: {
         title,
+        tldr,
         summary,
         date_reported: new Date(date_reported),
         published: published ?? false,
@@ -107,6 +110,7 @@ export async function PUT(
             title: la.title,
             status: la.status,
             description: la.description,
+            url: la.url || null,
           })),
         },
         sources: {

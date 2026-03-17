@@ -142,6 +142,7 @@ model Scandal {
   id               String            @id @default(cuid())
   title            String
   slug             String            @unique
+  tldr             String            @default("")
   summary          String
   why_it_matters   String
   rippling_effects String
@@ -163,6 +164,7 @@ model LegalAction {
   title       String
   status      String
   description String
+  url         String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

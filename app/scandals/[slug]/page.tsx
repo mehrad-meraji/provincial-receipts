@@ -71,8 +71,6 @@ export default async function ScandalDetailPage({ params }: PageProps) {
         <nav className="text-xs font-mono text-zinc-400 mb-6">
           <Link href="/" className="hover:underline">Dashboard</Link>
           <span className="mx-2">→</span>
-          <Link href="/scandals" className="hover:underline">Scandals</Link>
-          <span className="mx-2">→</span>
           <span>{scandal.title}</span>
         </nav>
 
@@ -83,6 +81,18 @@ export default async function ScandalDetailPage({ params }: PageProps) {
           </h1>
           <p className="font-mono text-sm text-zinc-500 mt-2">{dateLabel}</p>
         </div>
+
+        {/* TLDR */}
+        {scandal.tldr && (
+          <div className="mb-10 border-l-4 border-zinc-950 dark:border-white pl-4">
+            <h2 className="font-mono text-xs uppercase tracking-widest text-zinc-500 mb-2">
+              TL;DR
+            </h2>
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
+              {scandal.tldr}
+            </p>
+          </div>
+        )}
 
         {/* Why It Matters */}
         <div className="mb-10">
@@ -108,14 +118,21 @@ export default async function ScandalDetailPage({ params }: PageProps) {
               >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-zinc-950 dark:text-white">
-                    {action.title}
+                    {action.url ? (
+                      <a href={action.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        {action.title} ↗
+                      </a>
+                    ) : action.title}
                   </span>
                   <span className="font-mono text-[10px] bg-zinc-100 dark:bg-zinc-800 text-zinc-500 px-2 py-0.5">
                     {action.status}
                   </span>
                 </div>
                 {action.description && (
-                  <p className="text-sm text-zinc-500 mt-1">{action.description}</p>
+                  <div
+                    className="prose prose-sm dark:prose-invert max-w-none mt-1 text-zinc-500"
+                    dangerouslySetInnerHTML={{ __html: action.description }}
+                  />
                 )}
               </div>
             ))}

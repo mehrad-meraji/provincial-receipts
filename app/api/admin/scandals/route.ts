@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     title,
+    tldr = '',
     summary,
     date_reported,
     published,
@@ -97,12 +98,13 @@ export async function POST(req: NextRequest) {
     sources = [],
   } = body as {
     title: string
+    tldr: string
     summary: string
     date_reported: string
     published: boolean
     why_it_matters: string
     rippling_effects: string
-    legal_actions: { title: string; status: string; description: string }[]
+    legal_actions: { title: string; status: string; description: string; url?: string }[]
     bill_ids: string[]
     mpp_ids: string[]
     news_links: {
@@ -132,6 +134,7 @@ export async function POST(req: NextRequest) {
     data: {
       title,
       slug,
+      tldr,
       summary,
       date_reported: new Date(date_reported),
       published: published ?? false,
@@ -142,6 +145,7 @@ export async function POST(req: NextRequest) {
           title: la.title,
           status: la.status,
           description: la.description,
+          url: la.url || null,
         })),
       },
       sources: {

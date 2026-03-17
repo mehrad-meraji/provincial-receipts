@@ -15,9 +15,9 @@ Five coordinated changes to restructure the site's navigation, move sections off
 ## Section 1: Layout Restructuring
 
 ### DatelineBar Position
-- Move `<DatelineBar />` from **below** the Masthead to **above** it in every page.
-- Affected files: `app/page.tsx`, `app/budget/page.tsx`, `app/bills/[id]/page.tsx`, `app/mpps/[id]/page.tsx`
-- No component changes — just swap render order.
+- Move `<DatelineBar />` so it is rendered **before** `<Masthead />` in JSX in every page's `return` — i.e. `<DatelineBar />` is the first child of `<main>`, followed by `<Masthead />`. DatelineBar is not moved inside the Masthead component.
+- Affected files: `app/page.tsx`, `app/budget/page.tsx`, `app/bills/[id]/page.tsx`, `app/mpps/[id]/page.tsx`, `app/scandals/[slug]/page.tsx`
+- No component changes — just swap render order in each page.
 
 ### KPI Strip Removal
 - Remove `<KPIStrip />` component and its data queries from `app/page.tsx`.
@@ -29,6 +29,8 @@ Five coordinated changes to restructure the site's navigation, move sections off
 - Replace the two `<Link>` items in `Masthead.tsx` nav with a `<TabNav />` client component.
 - Tabs: **Home · Bills · MPPs · Budget** — each navigates to its URL route.
 - Active tab detected via `usePathname()` — requires `'use client'` sub-component.
+- Active tab uses **prefix matching**: a tab is active if the current pathname starts with its route prefix (e.g. `/bills/[id]` activates the `Bills` tab, `/mpps/[id]` activates `MPPs`). Exception: `Home` uses exact match on `/` only.
+- **No `Scandals` tab** — this is intentional. Scandals are home-page content surfaced via timeline and `ScandalFeed`; individual scandal pages (`/scandals/[slug]`) are reachable via links but are not a top-level nav destination. A scandals tab may be added in a future iteration.
 - Active tab styled with a clear visual indicator (underline or border-bottom on the active item).
 - `TabNav` is extracted into `app/components/layout/TabNav.tsx`.
 - Masthead imports and renders `<TabNav />` in place of the old `<nav>` block.
@@ -58,8 +60,10 @@ Five coordinated changes to restructure the site's navigation, move sections off
 ### Home page changes
 - Remove from `app/page.tsx`:
   - `topBills` query
-  - `Bills Section` JSX block (`SectionDivider` + `BillTable`)
+  - `Bills Section` JSX block (`SectionDivider label="Bills Affecting Toronto"` + `BillTable`)
   - `topBillTitle` variable
+  - The commented-out `<TorontoAlertBanner>` JSX line and the `import TorontoAlertBanner` import (dead after `topBillTitle` removal)
+- The **Scandals section** (inline `recentScandals` query + timeline JSX) and the **Queen's Park Watch** `ScandalFeed` section **stay on the home page** — they are the primary content of the home page after bills and MPPs are moved out.
 
 ### Breadcrumb update
 - `app/bills/[id]/page.tsx`: change breadcrumb from `Dashboard →` to `Bills →` with a link to `/bills`.
@@ -84,9 +88,9 @@ Five coordinated changes to restructure the site's navigation, move sections off
 
 ### Home page changes
 - Remove from `app/page.tsx`:
-  - `torontoMpps` query
+  - `torontoMpps` query and the `import type { MPP }` at the top (unused after removal)
   - `Toronto Area MPPs` section JSX
-  - The two-column grid wrapper (`grid lg:grid-cols-3`) — `ScandalFeed` expands to full width.
+  - The two-column grid wrapper (`grid-cols-1 lg:grid-cols-3`) — the `ScandalFeed` `<section>` moves out of the grid and becomes a top-level section. Also remove the `lg:col-span-2` class from the ScandalFeed `<section>` element since it's no longer inside a grid.
 
 ### Breadcrumb update
 - `app/mpps/[id]/page.tsx`: change breadcrumb from `Dashboard →` to `MPPs →` with a link to `/mpps`.
@@ -126,7 +130,22 @@ Cleaned names are written on the next scrape run. Existing dirty data remains un
 ## Section 5: Budget Admin Panel
 
 ### New component: `app/admin/components/BudgetPanel.tsx`
-- Added as a new tab in `app/admin/page.tsx` alongside existing panels.
+- Added as a new `<section>` block at the bottom of `app/admin/page.tsx`, matching the existing pattern (stacked sections with `<h2>` headings — not client-side tabs).
+- `AdminPage` (server component) fetches the snapshot in the `Promise.all` and **serialises all `bigint` fields to `string` before passing to `BudgetPanel`** (required because `BudgetPanel` is a client component and BigInt is not JSON-serialisable). The prop type is:
+  ```ts
+  {
+    id: string;
+    fiscal_year: string;
+    ministries: Array<{
+      id: string;
+      name: string;
+      amount: string; // bigint.toString() — cents
+      programs: Array<{ id: string; name: string; amount: string }>
+    }>
+  } | null
+  ```
+  `BudgetPanel` converts `amount` strings back to BigInt only when calling `formatBudgetAmount` for display.
+- If prop is `null`, `BudgetPanel` renders an empty-state message "No budget data. Run the scraper first."
 - Shows the current budget snapshot's ministries in an expandable accordion list.
 - Each ministry row:
   - Inline-editable name (click → edit field → Enter to save / Escape to cancel)
@@ -150,7 +169,42 @@ Cleaned names are written on the next scrape run. Existing dirty data remains un
 | `DELETE` | `/api/admin/budget/program/[id]` | Delete program |
 | `POST` | `/api/admin/budget/program` | Create new program under a ministry |
 
-All routes protected by existing Clerk auth middleware (same as other admin routes).
+All routes protected by existing Clerk auth middleware (same pattern as `/api/admin/*`). API routes return `401` on auth failure (not a redirect) — `BudgetPanel` must check `response.ok` on every fetch and display an inline error message on failure. No optimistic UI updates — wait for the API response before re-rendering.
+
+### API request/response contracts
+
+**`POST /api/admin/budget/ministry`**
+- Body: `{ name: string, amount: string }` — amount is a dollar string in millions (e.g. `"1200"` = $1,200M), converted to BigInt cents in the route.
+- "Current snapshot" resolved as: `prisma.budgetSnapshot.findFirst({ orderBy: { fiscal_year: 'desc' } })`.
+- Response: `201` with the created `BudgetMinistry` record (amounts serialised as strings).
+
+**`PATCH /api/admin/budget/ministry/[id]`**
+- Body: `{ name?: string, amount?: string }` — same dollar-in-millions string convention for amount.
+- Response: `200` with updated record.
+- On unique constraint violation (duplicate name under same snapshot): return `409` with `{ error: "A ministry with that name already exists." }`.
+
+**`DELETE /api/admin/budget/ministry/[id]`**
+- No body. Response: `204`.
+
+**`POST /api/admin/budget/program`**
+- Body: `{ ministryId: string, name: string, amount: string }` — amount in millions string.
+- Response: `201` with created `BudgetProgram` record.
+- On unique constraint violation (duplicate name under same ministry): return `409` with `{ error: "A program with that name already exists under this ministry." }`.
+
+**`PATCH /api/admin/budget/program/[id]`**
+- Body: `{ name?: string, amount?: string }` — same convention.
+- Response: `200` with updated record.
+- On unique constraint violation: return `409` with same pattern as POST program.
+
+**`DELETE /api/admin/budget/program/[id]`**
+- No body. Response: `204`.
+
+### Amount input UX
+- Admin enters amounts as **whole millions of dollars** (e.g. `1200` means $1,200M = $1.2B).
+- Input field shows a `M$` suffix label.
+- Route converts: `BigInt(inputString) * 100_000_000n` — this matches the existing scraper convention where `parseDollarString` with `unit: 'millions'` also multiplies by `100_000_000n` (each million = 100,000,000 cents).
+- Display uses existing `formatBudgetAmount(bigintCentsValue)` helper — same helper used on the budget page and home page KPIs.
+- `BudgetPanel` receives `amount` as `bigint` from the server prop; serialise to string for JSON across the client boundary (pass `amount.toString()` and parse back in the component).
 
 ### No new DB models
 `BudgetMinistry` and `BudgetProgram` models cover all required operations.
@@ -170,15 +224,19 @@ All routes protected by existing Clerk auth middleware (same as other admin rout
 - `app/api/admin/budget/program/[id]/route.ts` — PATCH/DELETE program
 
 ### Modified files
-- `app/page.tsx` — remove KPI, bills section, MPPs section, related queries; reorder DatelineBar
+- `app/page.tsx` — remove KPI, bills section, MPPs section, related queries; reorder DatelineBar above Masthead; scandals + news sections remain
 - `app/budget/page.tsx` — reorder DatelineBar above Masthead
-- `app/bills/[id]/page.tsx` — reorder DatelineBar; update breadcrumb
-- `app/mpps/[id]/page.tsx` — reorder DatelineBar; update breadcrumb
+- `app/bills/[id]/page.tsx` — reorder DatelineBar above Masthead; update breadcrumb to link `/bills`
+- `app/mpps/[id]/page.tsx` — reorder DatelineBar above Masthead; update breadcrumb to link `/mpps`
+- `app/scandals/[slug]/page.tsx` — reorder DatelineBar above Masthead (consistency). **Breadcrumb stays as `Dashboard → [scandal title]` linking to `/`** — the home page remains the logical parent for scandals since there is no `/scandals` list page.
 - `app/components/layout/Masthead.tsx` — replace nav with `<TabNav />`
-- `app/admin/page.tsx` — add Budget tab/panel
+- `app/admin/page.tsx` — add Budget section and fetch snapshot data in Promise.all
 - `lib/scraper/budget.ts` — improve title cleanup in `parseBudgetSummary` and `parseMinistryPrograms`
+
+### Already deleted (pre-existing, not part of this work)
+- `app/scandals/page.tsx` — was already deleted before this spec; `/scandals` has no list page. Not in scope here.
 
 ### Untouched
 - `app/components/bills/KPIStrip.tsx` — left on disk, just unused
-- All existing admin panels, scandal pages, news components
+- All existing admin panels, scandal detail pages, news components
 - Prisma schema — no changes
