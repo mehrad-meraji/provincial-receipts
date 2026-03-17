@@ -55,6 +55,7 @@ Five coordinated changes to restructure the site's navigation, move sections off
 - Fetches all published bills: `prisma.bill.findMany({ where: { published: true }, orderBy: { impact_score: 'desc' }, include: { sponsor_mpp: { select: { party: true, riding: true } } } })`.
 - No `take` limit — show all published bills.
 - Layout: `<DatelineBar />` → `<Masthead />` → `SectionDivider label="Bills"` → `<BillTable />` → footer.
+- Footer: copy the footer from `app/page.tsx` — "Data sourced from Ontario Legislative Assembly · Updated every 6 hours".
 - Reuses existing `BillTable` component unchanged.
 
 ### Home page changes
@@ -82,9 +83,10 @@ Five coordinated changes to restructure the site's navigation, move sections off
   })
   ```
 - Layout: `<DatelineBar />` → `<Masthead />` → two sections:
-  1. `SectionDivider label="Toronto Area MPPs"` → filtered subset in `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` grid using `<MPPCard />`
-  2. `SectionDivider label="All MPPs"` → remainder in same grid
+  1. `SectionDivider label="Toronto Area MPPs"` → MPPs filtered by `toronto_area === true` in `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` grid using `<MPPCard />`
+  2. `SectionDivider label="All MPPs"` → remainder (where `toronto_area === false`) in same grid
 - Reuses existing `MPPCard` component unchanged.
+- Footer: copy the footer from `app/page.tsx` — "Data sourced from Ontario Legislative Assembly · Updated every 6 hours".
 
 ### Home page changes
 - Remove from `app/page.tsx`:
@@ -162,7 +164,7 @@ Cleaned names are written on the next scrape run. Existing dirty data remains un
 
 | Method | Path | Action |
 |--------|------|--------|
-| `PATCH` | `/api/admin/budget/ministry/[id]` | Update ministry name/amount |
+| `PATCH` | `/api/admin/budget/ministry/[id]` | Update ministry name (amount is read-only) |
 | `DELETE` | `/api/admin/budget/ministry/[id]` | Delete ministry (cascades programs) |
 | `POST` | `/api/admin/budget/ministry` | Create new ministry under current snapshot |
 | `PATCH` | `/api/admin/budget/program/[id]` | Update program name/amount |
@@ -171,15 +173,19 @@ Cleaned names are written on the next scrape run. Existing dirty data remains un
 
 All routes protected by existing Clerk auth middleware (same pattern as `/api/admin/*`). API routes return `401` on auth failure (not a redirect) — `BudgetPanel` must check `response.ok` on every fetch and display an inline error message on failure. No optimistic UI updates — wait for the API response before re-rendering.
 
+### State management strategy
+`BudgetPanel` holds the full ministry+program list in local `useState` (initialised from the server prop). On each successful mutation (create/update/delete), update the local state directly — do **not** call `router.refresh()`. This matches the pattern used by `BillsPanel` and `ScandalsPanel` which manage their own local state after mutations.
+
 ### API request/response contracts
 
 **`POST /api/admin/budget/ministry`**
 - Body: `{ name: string, amount: string }` — amount is a dollar string in millions (e.g. `"1200"` = $1,200M), converted to BigInt cents in the route.
 - "Current snapshot" resolved as: `prisma.budgetSnapshot.findFirst({ orderBy: { fiscal_year: 'desc' } })`.
 - Response: `201` with the created `BudgetMinistry` record (amounts serialised as strings).
+- On unique constraint violation (duplicate name under same snapshot): return `409` with `{ error: "A ministry with that name already exists." }`.
 
 **`PATCH /api/admin/budget/ministry/[id]`**
-- Body: `{ name?: string, amount?: string }` — same dollar-in-millions string convention for amount.
+- Body: `{ name?: string }` — **name only**. Ministry amount is read-only (scraper-managed); the route ignores any `amount` field sent in the body.
 - Response: `200` with updated record.
 - On unique constraint violation (duplicate name under same snapshot): return `409` with `{ error: "A ministry with that name already exists." }`.
 
@@ -204,7 +210,7 @@ All routes protected by existing Clerk auth middleware (same pattern as `/api/ad
 - Input field shows a `M$` suffix label.
 - Route converts: `BigInt(inputString) * 100_000_000n` — this matches the existing scraper convention where `parseDollarString` with `unit: 'millions'` also multiplies by `100_000_000n` (each million = 100,000,000 cents).
 - Display uses existing `formatBudgetAmount(bigintCentsValue)` helper — same helper used on the budget page and home page KPIs.
-- `BudgetPanel` receives `amount` as `bigint` from the server prop; serialise to string for JSON across the client boundary (pass `amount.toString()` and parse back in the component).
+- `BudgetPanel` receives `amount` as a `string` (already serialised by `AdminPage`). It converts back to BigInt (`BigInt(amountStr)`) only when calling `formatBudgetAmount` for display.
 
 ### No new DB models
 `BudgetMinistry` and `BudgetProgram` models cover all required operations.
