@@ -40,13 +40,13 @@ export default async function BillPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen">
-      <Masthead />
       <DatelineBar />
+      <Masthead />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
         <nav className="text-xs font-mono text-zinc-400 mb-6">
-          <Link href="/" className="hover:underline">Dashboard</Link>
+          <Link href="/bills" className="hover:underline">Bills</Link>
           <span className="mx-2">→</span>
           <span>{bill.bill_number}</span>
         </nav>

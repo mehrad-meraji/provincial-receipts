@@ -63,8 +63,8 @@ export default async function ScandalDetailPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen">
-      <Masthead />
       <DatelineBar />
+      <Masthead />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
