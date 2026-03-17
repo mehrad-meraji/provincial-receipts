@@ -3,6 +3,7 @@ import ReportsPanel from './components/ReportsPanel'
 import ScandalQueue from './components/ScandalQueue'
 import NewsFeedOverride from './components/NewsFeedOverride'
 import BillsPanel from './components/BillsPanel'
+import ScandalsPanel from './components/ScandalsPanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,13 @@ export default async function AdminPage() {
           ...n,
           published_at: n.published_at.toISOString(),
         }))} />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Scandals
+        </h2>
+        <ScandalsPanel />
       </section>
 
       <section>

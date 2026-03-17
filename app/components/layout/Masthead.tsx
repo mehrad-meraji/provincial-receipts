@@ -57,6 +57,7 @@ export default function Masthead() {
       </p>
       <nav aria-label="Site navigation" className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
         <Link href="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
+        <Link href="/scandals" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Scandals</Link>
         <Link href="/budget" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Budget</Link>
       </nav>
     </header>

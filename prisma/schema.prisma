@@ -27,6 +27,7 @@ model Bill {
   sponsor_mpp     MPP?        @relation(fields: [sponsorMppId], references: [id])
   sponsorMppId    String?
   newsEvents      NewsEvent[]
+  scandals        Scandal[]
 }
 
 model MPP {
@@ -38,6 +39,7 @@ model MPP {
   url          String?
   toronto_area Boolean  @default(false)
   bills        Bill[]
+  scandals     Scandal[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -57,10 +59,11 @@ model NewsEvent {
   excerpt               String?
   hidden                Boolean  @default(false)
   scandal_review_status String?
-  bill                  Bill?    @relation(fields: [billId], references: [id])
+  bill                  Bill?              @relation(fields: [billId], references: [id])
   billId                String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  scandal_links         ScandalNewsLink[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
 }
 
 model ScrapeState {
@@ -133,4 +136,62 @@ model BudgetProgram {
 
   @@unique([ministryId, name])
   @@index([ministryId])
+}
+
+model Scandal {
+  id               String            @id @default(cuid())
+  title            String
+  slug             String            @unique
+  summary          String
+  why_it_matters   String
+  rippling_effects String
+  date_reported    DateTime
+  published        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  legal_actions    LegalAction[]
+  sources          ScandalSource[]
+  news_links       ScandalNewsLink[]
+  bills            Bill[]
+  mpps             MPP[]
+}
+
+model LegalAction {
+  id          String   @id @default(cuid())
+  scandal     Scandal  @relation(fields: [scandalId], references: [id], onDelete: Cascade)
+  scandalId   String
+  title       String
+  status      String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([scandalId])
+}
+
+model ScandalSource {
+  id        String   @id @default(cuid())
+  scandal   Scandal  @relation(fields: [scandalId], references: [id], onDelete: Cascade)
+  scandalId String
+  url       String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scandalId])
+}
+
+model ScandalNewsLink {
+  id              String     @id @default(cuid())
+  scandal         Scandal    @relation(fields: [scandalId], references: [id], onDelete: Cascade)
+  scandalId       String
+  news_event      NewsEvent? @relation(fields: [newsEventId], references: [id])
+  newsEventId     String?
+  external_url    String?
+  external_title  String?
+  external_source String?
+  external_date   DateTime?
+  createdAt       DateTime   @default(now())
+
+  @@index([scandalId])
 }

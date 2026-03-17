@@ -25,6 +25,10 @@ export default async function MPPPage({ params }: PageProps) {
         orderBy: { impact_score: 'desc' },
         take: 20,
       },
+      scandals: {
+        where: { published: true },
+        select: { id: true, title: true, slug: true },
+      },
     },
   })
 
@@ -94,6 +98,24 @@ export default async function MPPPage({ params }: PageProps) {
           <div>
             <SectionDivider label="Related News" />
             <LinkedNews items={linkedNews} title="News linked to their bills" />
+          </div>
+        )}
+
+        {/* Related scandals */}
+        {mpp.scandals.length > 0 && (
+          <div className="mb-8">
+            <SectionDivider label="Related Scandals" />
+            <div className="space-y-2">
+              {mpp.scandals.map((scandal: { id: string; title: string; slug: string }) => (
+                <Link
+                  key={scandal.id}
+                  href={`/scandals/${scandal.slug}`}
+                  className="block border border-zinc-200 dark:border-zinc-800 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                >
+                  <span className="text-sm text-zinc-950 dark:text-white">{scandal.title}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 

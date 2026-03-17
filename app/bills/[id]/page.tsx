@@ -25,6 +25,10 @@ export default async function BillPage({ params }: PageProps) {
     include: {
       sponsor_mpp: true,
       newsEvents: { orderBy: { published_at: 'desc' }, take: 10 },
+      scandals: {
+        where: { published: true },
+        select: { id: true, title: true, slug: true },
+      },
     },
   })
 
@@ -119,6 +123,24 @@ export default async function BillPage({ params }: PageProps) {
           <div className="mb-6">
             <SectionDivider label="Related News" />
             <LinkedNews items={bill.newsEvents} />
+          </div>
+        )}
+
+        {/* Related scandals */}
+        {bill.scandals.length > 0 && (
+          <div className="mb-6">
+            <SectionDivider label="Related Scandals" />
+            <div className="space-y-2">
+              {bill.scandals.map((scandal: { id: string; title: string; slug: string }) => (
+                <Link
+                  key={scandal.id}
+                  href={`/scandals/${scandal.slug}`}
+                  className="block border border-zinc-200 dark:border-zinc-800 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                >
+                  <span className="text-sm text-zinc-950 dark:text-white">{scandal.title}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         )}
 
