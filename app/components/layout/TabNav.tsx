@@ -24,6 +24,7 @@ export default function TabNav() {
         <Link
           key={href}
           href={href}
+          aria-current={isActive(href) ? 'page' : undefined}
           className={
             isActive(href)
               ? 'text-zinc-950 dark:text-white border-b border-zinc-950 dark:border-white pb-0.5'
