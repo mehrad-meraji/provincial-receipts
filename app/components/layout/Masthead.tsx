@@ -10,7 +10,7 @@ export default function Masthead() {
       >
         <span className="flex gap-4">
          {/* "FUCK" in Ontario red */}
-          <span style={{ color: '#c8102e' }} className="dark:text-white block">
+          <span style={{ color: '#c8102e' }} className="block">
 {`  █████▒█    ██  ▄████▄   ██ ▄█▀
 ▓██   ▒ ██  ▓██▒▒██▀ ▀█   ██▄█▒
 ▒████ ░▓██  ▒██░▒▓█    ▄ ▓███▄░
@@ -23,7 +23,7 @@ export default function Masthead() {
               ░`}
           </span>
           {/* "DOUG" in dark charcoal */}
-          <span style={{ color: '#1a1a1a' }} className="dark:text-white block">
+          <span className="text-[#1a1a1a] dark:text-white block">
 {`▓█████▄  ▒█████   █    ██    ▄████
 ▒██▀ ██▌▒██▒  ██▒ ██  ▓██▒  ██▒ ▀█▒
 ░██   █▌▒██░  ██▒▓██  ▒██░ ▒██░▄▄▄░

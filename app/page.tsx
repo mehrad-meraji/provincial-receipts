@@ -2,19 +2,22 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import Masthead from './components/layout/Masthead'
 import DatelineBar from './components/layout/DatelineBar'
-import SectionDivider from './components/layout/SectionDivider'
-import ScandalFeed from './components/news/ScandalFeed'
+// import SectionDivider from './components/layout/SectionDivider'
+// import ScandalFeed from './components/news/ScandalFeed'
+// import KPIStrip from "@/app/components/bills/KPIStrip";
 
 // Always SSR — data changes with every cron run
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  const [recentNews, recentScandals] = await Promise.all([
-    prisma.newsEvent.findMany({
-      where: { hidden: false },
-      orderBy: { published_at: 'desc' },
-      take: 20,
-    }),
+  const [
+    // recentNews,
+    recentScandals] = await Promise.all([
+    // prisma.newsEvent.findMany({
+    //   where: { hidden: false },
+    //   orderBy: { published_at: 'desc' },
+    //   take: 20,
+    // }),
     prisma.scandal.findMany({
       where: { published: true },
       orderBy: { date_reported: 'desc' },
@@ -33,9 +36,9 @@ export default async function HomePage() {
         {/* Scandals Section */}
         {recentScandals.length > 0 && (
           <section>
-            <SectionDivider label="Documented Scandals" />
+            <h1 className="mb-6 text-md uppercase font-bold text-zinc-500 dark:text-zinc-400">Documented Scandals</h1>
             <div className="relative pl-6">
-              <div className="absolute left-0 top-0 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800" />
+              <div className="absolute left-2 top-1 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800" />
               {recentScandals.map((scandal) => {
                 const dateLabel = new Date(scandal.date_reported).toLocaleDateString('en-CA', {
                   year: 'numeric', month: 'short', day: 'numeric',
@@ -48,7 +51,7 @@ export default async function HomePage() {
                 ].filter(b => b.count > 0)
                 return (
                   <div key={scandal.id} className="relative mb-8">
-                    <div className="absolute -left-[19px] top-1.5 w-2 h-2 rounded-full bg-zinc-950 dark:bg-white" />
+                    <div className="absolute -left-4.75 top-1 w-2 h-2 rounded-full bg-zinc-950 dark:bg-white" />
                     <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">{dateLabel}</p>
                     <Link
                       href={`/scandals/${scandal.slug}`}
@@ -74,10 +77,10 @@ export default async function HomePage() {
         )}
 
         {/* Queen's Park Watch */}
-        <section>
-          <SectionDivider label="Queen's Park Watch" />
-          <ScandalFeed items={recentNews} />
-        </section>
+        {/*<section>*/}
+        {/*  <SectionDivider label="Queen's Park Watch" />*/}
+        {/*  <ScandalFeed items={recentNews} />*/}
+        {/*</section>*/}
       </div>
 
       <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-12 py-6 text-center text-xs text-zinc-400 dark:text-zinc-600 font-mono">
