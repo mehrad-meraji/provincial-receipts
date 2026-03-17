@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import TabNav from './TabNav'
 
 export default function Masthead() {
   return (
@@ -18,10 +18,10 @@ export default function Masthead() {
 ░▒█░   ▒▒█████▓ ▒ ▓███▀ ░▒██▒ █▄
  ▒ ░   ░▒▓▒ ▒ ▒ ░ ░▒ ▒  ░▒ ▒▒ ▓▒
  ░     ░░▒░ ░ ░   ░  ▒   ░ ░▒ ▒░
- ░ ░    ░░░ ░ ░ ░        ░ ░░ ░ 
-          ░     ░ ░      ░  ░ 
+ ░ ░    ░░░ ░ ░ ░        ░ ░░ ░
+          ░     ░ ░      ░  ░
               ░`}
-        </span>
+          </span>
           {/* "DOUG" in dark charcoal */}
           <span style={{ color: '#1a1a1a' }} className="dark:text-white block">
 {`▓█████▄  ▒█████   █    ██    ▄████
@@ -34,7 +34,7 @@ export default function Masthead() {
  ░ ░  ░ ░ ░ ░ ▒   ░░░ ░ ░  ░ ░   ░
 ░        ░ ░     ░          ░   ░
 `}
-        </span>
+          </span>
         </span>
 
         {/* "FORD" in Ontario red */}
@@ -55,10 +55,7 @@ export default function Masthead() {
       <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-mono">
         Ontario&apos;s Premier Accountability Dashboard · Queen&apos;s Park Watch
       </p>
-      <nav aria-label="Site navigation" className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400">
-        <Link href="/" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Home</Link>
-        <Link href="/budget" className="hover:text-zinc-900 dark:hover:text-white transition-colors">Budget</Link>
-      </nav>
+      <TabNav />
     </header>
   )
 }
