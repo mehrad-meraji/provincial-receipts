@@ -118,7 +118,7 @@ let cleanName = rawName
   .trim()
 ```
 
-**Improve `normName` dedup key:** strip trailing digits *before* normalising, so `"health1"` and `"health"` collapse to the same key.
+**`normName` dedup:** No separate change needed. Since `normName = normaliseMinistryName(cleanName)` is computed *after* `cleanName` is already stripped of trailing digits, `"Ministry of Health1"` → `cleanName = "Ministry of Health"` → `normName = "health"`. The existing dedup logic (prefer larger amount on collision) is unchanged and sufficient.
 
 **Apply same cleanup to `parseMinistryPrograms`:** program row names get the same `cleanName` treatment.
 
