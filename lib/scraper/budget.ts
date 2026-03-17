@@ -186,7 +186,9 @@ export function parseBudgetSummary(html: string): SummaryResult {
       // Cleanup: strip (Total), (Base) and footnotes
       let cleanName = rawName
         .replace(/\s*\([\s\w]+\)\s*$/i, '') // Strips (Base), (Total), (Total programs), etc
-        .replace(/sup.*$/i, '')            // Strips sup tags/markers if any leaked in
+        .replace(/sup.*$/i, '')              // Strips sup tags/markers if any leaked in
+        .replace(/\d+$/, '')                 // Strip trailing footnote digits
+        .replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+/g, '')    // Strip unicode superscript digits
         .replace(/\s+/g, ' ')
         .trim()
       
@@ -269,7 +271,12 @@ export function parseMinistryPrograms(html: string): ProgramRow[] {
     $(table).find('tr').each((_j, row) => {
       const cells = $(row).find('td')
       if (cells.length < 2) return
-      const name = $(cells[0]).text().trim()
+      const rawProgramName = $(cells[0]).text().trim()
+      const name = rawProgramName
+        .replace(/\d+$/, '')              // Strip trailing footnote digits
+        .replace(/[¹²³⁴⁵⁶⁷⁸⁹⁰]+/g, '') // Strip unicode superscript digits
+        .replace(/\s+/g, ' ')
+        .trim()
       const valueText = $(cells[1]).text().trim()
       if (!name || !valueText) return
       try {
