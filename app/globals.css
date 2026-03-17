@@ -46,4 +46,11 @@
     background: #d4d4d8;
     border-radius: 3px;
   }
+
+  .prose {
+    p {
+      margin-top: 1rem;
+      margin-bottom: 1rem;
+    }
+  }
 }
