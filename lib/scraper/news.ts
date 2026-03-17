@@ -1,12 +1,10 @@
 // lib/scraper/news.ts
 //
-// Scrapes RSS feeds, classifies articles via AI, and stores new NewsEvent
-// records. Caps at 25 new articles per invocation to stay within Vercel's
-// 60s function timeout.
+// Fetches news articles from NewsAPI, classifies them via AI, and stores new
+// NewsEvent records. Caps at 25 new articles per invocation.
 
 import { classifyArticle, extractBillNumber, type ArticleClassification } from '@/lib/ai/classify'
 import { prisma } from '@/lib/db'
-import { delay } from './utils'
 import { fetchNewsApiArticles } from './newsapi'
 
 const MAX_NEW_ARTICLES = 25
@@ -50,18 +48,13 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
   })
   const existingUrls = new Set(existingRecords.map((r) => r.url))
 
-  const pendingItems = allCandidates.filter((c) => !existingUrls.has(c.link))
+  const pendingItems = allCandidates
+    .filter((c) => !existingUrls.has(c.link))
+    .slice(0, MAX_NEW_ARTICLES)
 
-  // Process and store each new item
-  let firstItem = true
+  const CONCURRENCY = 5
 
-  for (const item of pendingItems) {
-    // Rate-limit friendliness: delay between AI classification calls
-    if (!firstItem) {
-      await delay(200)
-    }
-    firstItem = false
-
+  async function processItem(item: PendingItem): Promise<boolean> {
     const headline = item.title
     const rawExcerpt = item.contentSnippet ?? item.content ?? ''
     const excerpt = rawExcerpt.slice(0, 500)
@@ -85,7 +78,6 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
     }
 
     classification = await classifyArticle(headline, excerpt)
-    classified++
 
     // Look up linked bill by extracted bill number
     let linkedBill: { id: string } | null = null
@@ -119,11 +111,25 @@ export async function scrapeNews(): Promise<NewsScrapeResult> {
           billId: linkedBill?.id ?? undefined,
         },
       })
-      stored++
+      return true
     } catch (err) {
       console.warn(
         `[scraper/news] Failed to store article "${headline}": ${err instanceof Error ? err.message : String(err)}`
       )
+      return false
+    }
+  }
+
+  // Process articles in batches of CONCURRENCY
+  for (let i = 0; i < pendingItems.length; i += CONCURRENCY) {
+    const batch = pendingItems.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(batch.map(item => processItem(item)))
+
+    for (const result of results) {
+      classified++
+      if (result.status === 'fulfilled' && result.value) {
+        stored++
+      }
     }
   }
 

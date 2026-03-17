@@ -1,5 +1,6 @@
 import robotsParser from 'robots-parser'
 import axios from 'axios'
+import * as cheerio from 'cheerio'
 import stringSimilarity from 'string-similarity'
 
 export const USER_AGENT =
@@ -45,16 +46,19 @@ export async function checkRobotsTxt(baseUrl: string, path: string): Promise<boo
   }
 }
 
-const PARLIAMENT_CACHE: { number: string; cachedAt: number } | null = null
+// Parliament cache — mutable so it actually persists across calls
+let parliamentCache: { number: string; cachedAt: number } | null = null
 const PARLIAMENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 /**
  * Dynamically detect the current parliament number by scraping the OLA bills page.
- * Falls back to parliament-44 if detection fails.
+ * Caches the result for 24 hours. Falls back to parliament-44 if detection fails.
  */
 export async function getCurrentParliament(): Promise<string> {
-  // Note: Using a simple mutable check instead of a cached object
-  // In production, consider using a proper cache or database
+  if (parliamentCache && Date.now() - parliamentCache.cachedAt < PARLIAMENT_CACHE_TTL_MS) {
+    return parliamentCache.number
+  }
+
   try {
     const billsPageUrl = 'https://www.ola.org/en/legislative-business/bills/current'
     const { data } = await axios.get(billsPageUrl, {
@@ -62,7 +66,6 @@ export async function getCurrentParliament(): Promise<string> {
       timeout: 10000,
     })
 
-    const cheerio = await import('cheerio')
     const $ = cheerio.load(data)
 
     // Extract parliament number from first bill link: /parliament-44/session-1/bill-XX
@@ -70,7 +73,9 @@ export async function getCurrentParliament(): Promise<string> {
     if (billLink) {
       const match = billLink.match(/parliament-(\d+)/)
       if (match && match[1]) {
-        return `parliament-${match[1]}`
+        const result = `parliament-${match[1]}`
+        parliamentCache = { number: result, cachedAt: Date.now() }
+        return result
       }
     }
 

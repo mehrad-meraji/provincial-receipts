@@ -2,7 +2,7 @@ import OpenAI from 'openai'
 
 // Swap provider by changing these two values:
 const AI_BASE_URL = 'https://models.inference.ai.azure.com'  // GitHub Models
-const AI_MODEL = 'gpt-5-mini'
+const AI_MODEL = 'gpt-4o-mini'
 
 let _client: OpenAI | null = null
 

@@ -6,7 +6,7 @@
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { buildHeaders, checkRobotsTxt, delay, getCurrentParliament } from './utils'
+import { buildHeaders, checkRobotsTxt, getCurrentParliament } from './utils'
 import { STATIC_KEYWORDS } from '@/lib/classifier/keywords'
 import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 
@@ -71,7 +71,7 @@ async function fetchHansardLinks(): Promise<HansardLink[]> {
     links.push({ date: dateText, url: fullUrl })
   })
 
-  // Return the most recent MAX_DOCUMENTS entries (already in reverse chronological order)
+  // Return the most recent MAX_DOCUMENTS entries
   return links.slice(0, MAX_DOCUMENTS)
 }
 
@@ -89,7 +89,6 @@ async function fetchHansardDocument(
   })
 
   const $ = cheerio.load(data)
-  // Extract all visible text from the document body
   const bodyText = $('body').text()
 
   // Find keyword matches (case-insensitive, deduplicated)
@@ -105,7 +104,6 @@ async function fetchHansardDocument(
   const billMatches = bodyText.match(/Bill\s+\d+/gi) ?? []
   const billNumbersFound = [...new Set(
     billMatches.map((m) => {
-      // Normalise to "Bill N" with a single space
       const num = m.match(/\d+/)?.[0] ?? ''
       return `Bill ${num}`
     })
@@ -129,11 +127,9 @@ export async function scrapeHansard(): Promise<HansardScrapeResult> {
     return { entries: [] }
   }
 
-  // Detect current parliament dynamically
   const parliament = await getCurrentParliament()
   const hansardPath = OLA_HANSARD_PATH_TEMPLATE.replace('{parliament}', parliament)
 
-  // Check robots.txt before any scraping
   const allowed = await checkRobotsTxt(OLA_BASE, hansardPath)
   if (!allowed) {
     throw new Error(`robots.txt disallows scraping ${hansardPath}`)
@@ -149,30 +145,27 @@ export async function scrapeHansard(): Promise<HansardScrapeResult> {
     }
     throw err
   }
+
   const keywordTerms = getAllKeywordTerms()
+
+  // Fetch all documents concurrently (only 5 max, very manageable)
+  const results = await Promise.allSettled(
+    links.map(link => fetchHansardDocument(link, keywordTerms))
+  )
+
   const entries: HansardEntry[] = []
-
-  let firstDoc = true
-
-  for (const link of links) {
-    // Polite delay between document fetches (skip before the first document)
-    if (!firstDoc) {
-      await delay(1000)
-    }
-    firstDoc = false
-
-    try {
-      const entry = await fetchHansardDocument(link, keywordTerms)
-      entries.push(entry)
-    } catch (err) {
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      entries.push(result.value)
+    } else {
+      const err = result.reason
       if ((err as any)?.response?.status === 429) {
         await setBackoff('ola-hansard', String(err))
         break
       }
       console.warn(
-        `[scraper/hansard] Failed to fetch document ${link.url}: ${err instanceof Error ? err.message : String(err)}`
+        `[scraper/hansard] Failed to fetch document: ${err instanceof Error ? err.message : String(err)}`
       )
-      // skip on error — never crash the whole scrape
     }
   }
 

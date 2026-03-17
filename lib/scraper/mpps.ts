@@ -1,8 +1,7 @@
 // lib/scraper/mpps.ts
 //
 // Scrapes the Ontario Legislative Assembly MPP roster page and upserts records
-// into the MPP table. Processes all current MPPs, fetching each detail page to
-// pick up email addresses.
+// into the MPP table. Fetches each detail page to pick up email addresses.
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
@@ -12,6 +11,8 @@ import { isBackedOff, setBackoff, clearBackoff } from './backoff'
 
 const OLA_BASE = 'https://www.ola.org'
 const OLA_MPPS_PATH = '/en/members/current'
+
+const DETAIL_CONCURRENCY = 5
 
 const TORONTO_KEYWORDS = [
   'Toronto',
@@ -86,7 +87,6 @@ async function fetchMppEmail(detailUrl: string): Promise<string | null> {
 
     const $ = cheerio.load(data)
 
-    // TODO: verify selectors against live OLA HTML after first deployment
     const emailEl = $('.field--name-field-email a')
     const email = emailEl.attr('href')?.replace(/^mailto:/i, '').trim()
     return (email ?? emailEl.text().trim()) || null
@@ -105,7 +105,6 @@ export async function scrapeMpps(): Promise<MppScrapeResult> {
     return { scraped: 0, upserted: 0 }
   }
 
-  // Check robots.txt before any scraping
   const allowed = await checkRobotsTxt(OLA_BASE, OLA_MPPS_PATH)
   if (!allowed) {
     throw new Error(`robots.txt disallows scraping ${OLA_MPPS_PATH}`)
@@ -123,51 +122,58 @@ export async function scrapeMpps(): Promise<MppScrapeResult> {
   }
 
   let upserted = 0
-  let firstMpp = true
+  let rateLimited = false
 
-  for (const row of rows) {
-    try {
-      // Polite delay between detail fetches (skip before the first MPP)
-      if (!firstMpp) {
-        await delay(500)
+  async function processMpp(row: MppListRow): Promise<boolean> {
+    const email = await fetchMppEmail(row.url)
+
+    const toronto_area = TORONTO_KEYWORDS.some((keyword) =>
+      row.riding.includes(keyword)
+    )
+
+    await prisma.mPP.upsert({
+      where: { name_riding: { name: row.name, riding: row.riding } },
+      create: {
+        name: row.name,
+        party: row.party,
+        riding: row.riding,
+        email: email ?? undefined,
+        url: row.url,
+        toronto_area,
+      },
+      update: {
+        party: row.party,
+        email: email ?? undefined,
+        url: row.url,
+        toronto_area,
+      },
+    })
+
+    return true
+  }
+
+  for (let i = 0; i < rows.length; i += DETAIL_CONCURRENCY) {
+    if (rateLimited) break
+    if (i > 0) await delay(300) // polite delay between batches
+
+    const batch = rows.slice(i, i + DETAIL_CONCURRENCY)
+    const results = await Promise.allSettled(batch.map(row => processMpp(row)))
+
+    for (let j = 0; j < results.length; j++) {
+      const result = results[j]
+      if (result.status === 'fulfilled') {
+        upserted++
+      } else {
+        const err = result.reason
+        if ((err as any)?.response?.status === 429) {
+          await setBackoff('ola-mpps', String(err))
+          rateLimited = true
+          break
+        }
+        console.warn(
+          `[scraper/mpps] Failed to process MPP ${batch[j].name}: ${err instanceof Error ? err.message : String(err)}`
+        )
       }
-      firstMpp = false
-
-      // Fetch email from detail page
-      const email = await fetchMppEmail(row.url)
-
-      // Determine if this riding is in the Toronto area
-      const toronto_area = TORONTO_KEYWORDS.some((keyword) =>
-        row.riding.includes(keyword)
-      )
-
-      await prisma.mPP.upsert({
-        where: { name_riding: { name: row.name, riding: row.riding } },
-        create: {
-          name: row.name,
-          party: row.party,
-          riding: row.riding,
-          email: email ?? undefined,
-          url: row.url,
-          toronto_area,
-        },
-        update: {
-          party: row.party,
-          email: email ?? undefined,
-          url: row.url,
-          toronto_area,
-        },
-      })
-
-      upserted++
-    } catch (err) {
-      if ((err as any)?.response?.status === 429) {
-        await setBackoff('ola-mpps', String(err))
-        break
-      }
-      console.warn(
-        `[scraper/mpps] Failed to process MPP ${row.name}: ${err instanceof Error ? err.message : String(err)}`
-      )
     }
   }
 
