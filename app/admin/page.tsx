@@ -4,11 +4,12 @@ import ScandalQueue from './components/ScandalQueue'
 import NewsFeedOverride from './components/NewsFeedOverride'
 import BillsPanel from './components/BillsPanel'
 import ScandalsPanel from './components/ScandalsPanel'
+import TimelineEventsPanel from './components/TimelineEventsPanel'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const [reports, pendingScandals, recentNews] = await Promise.all([
+  const [reports, pendingScandals, recentNews, timelineEvents] = await Promise.all([
     prisma.report.findMany({
       where: { status: 'pending' },
       orderBy: { createdAt: 'desc' },
@@ -33,6 +34,9 @@ export default async function AdminPage() {
       orderBy: { published_at: 'desc' },
       take: 50,
       select: { id: true, headline: true, url: true, source: true, published_at: true, hidden: true, is_scandal: true },
+    }),
+    prisma.timelineEvent.findMany({
+      orderBy: { date: 'desc' },
     }),
   ])
 
@@ -81,6 +85,20 @@ export default async function AdminPage() {
           Bills
         </h2>
         <BillsPanel />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Timeline Events
+        </h2>
+        <TimelineEventsPanel
+          initialEvents={timelineEvents.map(e => ({
+            ...e,
+            date: e.date.toISOString(),
+            createdAt: e.createdAt.toISOString(),
+            updatedAt: e.updatedAt.toISOString(),
+          }))}
+        />
       </section>
     </main>
   )

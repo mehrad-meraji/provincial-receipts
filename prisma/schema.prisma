@@ -197,3 +197,16 @@ model ScandalNewsLink {
 
   @@index([scandalId])
 }
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  date        DateTime
+  label       String
+  description String?
+  url         String?
+  icon        String?  // Lucide icon name e.g. "Newspaper", "AlertTriangle", "Flag"
+  type        String   @default("news") // "news" | "context" | "milestone"
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
