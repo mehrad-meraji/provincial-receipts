@@ -2,6 +2,9 @@ import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import Masthead from './components/layout/Masthead'
 import DatelineBar from './components/layout/DatelineBar'
+import PeopleCarousel from './components/people/PeopleCarousel'
+import { getPeopleForCarousel } from '@/lib/people'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import {
   Newspaper, AlertTriangle, Flag, Gavel, Lock, Syringe,
   Vote, Megaphone, FileText, Globe, type LucideIcon,
@@ -29,6 +32,7 @@ export default async function HomePage() {
     // recentNews,
     recentScandals,
     dbTimelineEvents,
+    flags,
   ] = await Promise.all([
     // prisma.newsEvent.findMany({
     //   where: { hidden: false },
@@ -46,12 +50,23 @@ export default async function HomePage() {
     (prisma.timelineEvent as typeof prisma.timelineEvent | undefined)
       ?.findMany({ where: { published: true }, orderBy: { date: 'desc' } })
       .catch(() => []) ?? Promise.resolve([]),
+    getFeatureFlags(),
   ])
+
+  const carouselPeople = flags.named_individuals_enabled
+    ? await getPeopleForCarousel()
+    : []
 
   return (
     <main className="min-h-screen">
       <DatelineBar />
       <Masthead />
+
+      {carouselPeople.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 pt-6">
+          <PeopleCarousel people={carouselPeople} />
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
         {/* Scandals Section */}

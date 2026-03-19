@@ -3,15 +3,25 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-const TABS = [
+const BASE_TABS = [
   { label: 'Home',   href: '/' },
   { label: 'Bills',  href: '/bills' },
   { label: 'MPPs',   href: '/mpps' },
   { label: 'Budget', href: '/budget' },
 ] as const
 
-export default function TabNav() {
+const PEOPLE_TAB = { label: 'People', href: '/people' } as const
+
+interface TabNavProps {
+  showPeople?: boolean
+}
+
+export default function TabNav({ showPeople = false }: TabNavProps) {
   const pathname = usePathname()
+
+  const tabs = showPeople
+    ? [BASE_TABS[0], PEOPLE_TAB, ...BASE_TABS.slice(1)]
+    : [...BASE_TABS]
 
   function isActive(href: string) {
     if (href === '/') return pathname === '/'
@@ -20,7 +30,7 @@ export default function TabNav() {
 
   return (
     <nav aria-label="Site navigation" className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest">
-      {TABS.map(({ label, href }) => (
+      {tabs.map(({ label, href }) => (
         <Link
           key={href}
           href={href}

@@ -1,6 +1,9 @@
 import TabNav from './TabNav'
+import { getFeatureFlags } from '@/lib/feature-flags'
 
-export default function Masthead() {
+export default async function Masthead() {
+  const flags = await getFeatureFlags()
+
   return (
     <header className="w-full border-b-4 border-zinc-950 dark:border-white py-6 px-4 text-center">
       {/* ASCII art - pre block with exact characters */}
@@ -55,7 +58,7 @@ export default function Masthead() {
       <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-mono">
         Ontario&apos;s Premier Accountability Dashboard · Queen&apos;s Park Watch
       </p>
-      <TabNav />
+      <TabNav showPeople={flags.named_individuals_enabled} />
     </header>
   )
 }
