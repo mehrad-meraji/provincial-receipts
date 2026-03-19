@@ -5,6 +5,8 @@ import NewsFeedOverride from './components/NewsFeedOverride'
 import BillsPanel from './components/BillsPanel'
 import ScandalsPanel from './components/ScandalsPanel'
 import TimelineEventsPanel from './components/TimelineEventsPanel'
+import FeatureFlagsPanel from './components/FeatureFlagsPanel'
+import PeoplePanel from './components/PeoplePanel'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,6 +102,21 @@ export default async function AdminPage() {
           }))}
         />
       </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Feature Flags
+        </h2>
+        <FeatureFlagsPanel />
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          People
+        </h2>
+        <PeoplePanel />
+      </section>
+
     </main>
   )
 }
