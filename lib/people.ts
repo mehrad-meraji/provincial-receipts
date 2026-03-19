@@ -4,7 +4,7 @@ import { Confidence } from '@prisma/client'
 const PUBLIC_WHERE = {
   confidence: { in: [Confidence.high, Confidence.medium] as Confidence[] },
   published: true,
-}
+} as const
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
