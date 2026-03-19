@@ -99,6 +99,22 @@ export default async function HomePage() {
                     url: e.url ?? null,
                   })),
                 ].sort((a, b) => b.date.getTime() - a.date.getTime())
+                  // Include events up to end of current month; future events within the month
+                  // display as the 1st of the month until their actual date arrives.
+                  .filter((() => {
+                    const now = new Date()
+                    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+                    return (item: Item) => item.kind === 'scandal' || item.date <= endOfMonth
+                  })())
+                  .map((item): Item => {
+                    if (item.kind === 'event' && item.date > new Date()) {
+                      const d = new Date()
+                      return { ...item, date: new Date(d.getFullYear(), d.getMonth(), 1) }
+                    }
+                    return item
+                  })
+                  // Re-sort after date clamping so year markers always appear before their year's items
+                  .sort((a, b) => b.date.getTime() - a.date.getTime())
 
                 const nodes: React.ReactNode[] = []
                 let lastYear: number | null = null
