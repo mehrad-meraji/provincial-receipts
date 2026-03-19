@@ -182,6 +182,51 @@ All admin routes protected by Clerk `auth()` check, same pattern as existing adm
 
 ---
 
+## Photo Treatment — Newsprint / Dossier Filter
+
+All person photos receive a permanent newsprint comic filter — no hover lift, always on. The effect is applied via a shared CSS class and pseudo-element, defined once in `app/globals.css` and reused everywhere a photo appears.
+
+### CSS Implementation
+
+**`.person-photo-wrapper`** — applied to the `<div>` wrapping every `<img>`:
+```css
+.person-photo-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.person-photo-wrapper img {
+  filter: grayscale(100%) contrast(150%) brightness(0.9);
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.person-photo-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.15'/%3E%3C/svg%3E");
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+  pointer-events: none;
+}
+```
+
+### Scope
+- **`PersonCard.tsx`** — carousel cards + gallery cards (thumbnail size)
+- **`/people/[slug]` detail page hero** — full-size photo
+- **Redacted placeholder block** — no filter applied (already styled as a solid black rectangle; the filter would be invisible)
+
+### Where it lives
+Single definition in `app/globals.css`. No component-specific CSS, no duplication. Any future use of person photos automatically gets the treatment by applying the wrapper class.
+
+### Dark mode note
+`mix-blend-mode: multiply` is invisible on dark backgrounds. In a `@media (prefers-color-scheme: dark)` block, the `::after` blend mode should switch to `overlay`, which works correctly on both light and dark canvases. Implementer must test both modes.
+
+---
+
 ## Navigation
 
 Add "People" tab to `app/components/layout/TabNav.tsx` alongside Bills, MPPs, Budget.
@@ -233,8 +278,9 @@ app/
       PeopleCarousel.tsx            # Landing page carousel
       PersonCard.tsx                # Shared card (carousel + gallery)
       PersonBadge.tsx               # Connection type badge
-    admin/
-      PeoplePanel.tsx               # Admin panel component
+  admin/
+    components/
+      PeoplePanel.tsx               # Admin panel component (follows existing admin/components/ convention)
   admin/
     page.tsx                        # MODIFIED: add PeoplePanel
   api/
