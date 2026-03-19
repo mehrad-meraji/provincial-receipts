@@ -37,8 +37,8 @@ Using a Prisma enum prevents invalid values at the DB layer. The three values ar
 | `id` | String (cuid) | PK |
 | `slug` | String (unique) | Used in URLs (`/people/[slug]`) |
 | `name` | String | Actual full name |
-| `bio` | String | Short biography paragraph |
-| `photo_url` | String? | Public domain / official photo URL |
+| `bio` | String? | Short biography paragraph (optional — may not be available at time of entry) |
+| `photo_filename` | String? | Filename only (e.g. `john-doe.jpg`) — resolved to `/people/[filename]` at render time |
 | `organization` | String? | Company or org affiliation |
 | `organization_url` | String? | Link to org website or registry entry |
 | `confidence` | Confidence | `high` \| `medium` \| `low` (enum) |
@@ -86,9 +86,25 @@ Using a Prisma enum prevents invalid values at the DB layer. The three values ar
 
 ---
 
+## Image Hosting
+
+Photos are stored locally in the Next.js project at `public/people/[filename]`. This avoids external URL rot (Wikipedia paths change, government sites go down) and keeps the project self-contained.
+
+**Naming convention:** `[slug].jpg` — e.g. `public/people/john-doe.jpg`. Matches the person's slug so images are trivially discoverable.
+
+**In seed scripts:** set `photo_filename: 'john-doe.jpg'` — the image file must be manually added to `public/people/` before the seed runs, or left null for the redacted placeholder to render.
+
+**In the admin form:** `photo_filename` is a plain text input (just the filename). Admin is responsible for placing the file in `public/people/` via the repo. A future enhancement could add file upload, but that's out of scope for this spec.
+
+**At render time:** `PersonCard.tsx` and the detail page resolve the path as `/people/${photo_filename}` and pass it to `<Image>` with appropriate `width`/`height` and `alt`. If `photo_filename` is null, the redacted placeholder renders instead.
+
+**`next.config` note:** No `remotePatterns` needed — all images are local.
+
+---
+
 ## `lib/people.ts` — Public Query Interface
 
-This module is the single source of truth for all public-facing person queries.
+This module exports **only public-safe queries**. The confidence filter (`high | medium`) and `published: true` gate are baked into every function here. Admin routes **do not use this module** — they query Prisma directly via `lib/db.ts` (the `prisma` singleton) so they see all records including `low` confidence and unpublished.
 
 ```ts
 // Returns all published high/medium people, with their connections pre-joined
@@ -105,7 +121,9 @@ getPeopleForCarousel(): Promise<PersonCardData[]>
 
 `PersonWithConnections` includes: all Person fields + `connections[]` (with scandal title, slug, tldr) + primary `connection_type` badge.
 `PersonWithDetails` includes: all Person fields + `connections[]` (full scandal join) + `sources[]`.
-`PersonCardData` is a slim projection: `slug`, `name`, `photo_url`, `organization`, `confidence`, primary `connection_type`.
+`PersonCardData` is a slim projection: `slug`, `name`, `photo_filename`, `organization`, primary `connection_type`.
+
+**Admin routes** import `prisma` from `lib/db.ts` directly and apply no confidence filter. This is the same pattern used by all other admin routes in the codebase (e.g. `/api/admin/scandals/route.ts`). There is no `lib/admin/people.ts` — admin uses raw Prisma, public uses `lib/people.ts`. These two paths never share a function.
 
 ---
 
@@ -235,15 +253,47 @@ Add "People" tab to `app/components/layout/TabNav.tsx` alongside Bills, MPPs, Bu
 
 ## Seed Scripts
 
-Each person gets their own `scripts/seed-person-[name].ts` following the existing scandal seed pattern:
-- Uses `neon()` HTTP driver directly (no WebSocket issues)
-- Slug-based duplicate check before insert
-- Inserts `Person` → `PersonConnection`(s) → `PersonSource`(s) in sequence
-- Confidence assigned at seed time based on source:
-  - Registry file → `high`
-  - News article / FOI / court filing → `medium`
-  - Corporate registry inference → `low`
-- Uses `@@unique` constraint with upsert-safe insert (skip on conflict for connections)
+People seeds use a **data + importer** pattern rather than one script per person. Scandal seeds are per-file because each contains paragraphs of HTML and rich unique content. Person records are structured data — one file per person would produce 40+ nearly-identical scripts differing only in payload, which is a maintenance burden not a feature.
+
+### Structure
+
+**`data/people.ts`** — the data file. An exported array of typed person objects:
+```ts
+export const PEOPLE_DATA: PersonSeedRecord[] = [
+  {
+    slug: 'john-doe',
+    name: 'John Doe',
+    bio: 'Registered lobbyist for Therme Canada...',
+    photo_filename: 'john-doe.jpg',
+    organization: 'Therme Canada',
+    organization_url: 'https://...',
+    confidence: 'high',
+    connections: [
+      {
+        scandal_slug: 'ontario-place',
+        connection_type: 'Lobbyist',
+        description: 'Lobbied Premier\'s Office re: Ontario Place, 2021'
+      }
+    ],
+    sources: [
+      {
+        url: 'https://lobbyist.oico.on.ca/...',
+        title: 'Ontario Lobbyist Registry — Therme Canada, 2021',
+        source_type: 'Registry'
+      }
+    ]
+  },
+  // ...
+]
+```
+
+**`scripts/seed-people.ts`** — the single importer. Loops over `PEOPLE_DATA`, runs the same slug-check + insert pattern as scandal seeds using the `neon()` HTTP driver. Idempotent: skips existing slugs, upserts connections using the `@@unique` constraint.
+
+### Why this pattern
+- Adding a new person = one new object in `data/people.ts`, no new file
+- The seed logic lives in one place and is tested once
+- The data file is easy to review, diff, and search
+- Still uses the same `neon()` HTTP driver as all other seeds — no new infrastructure
 
 ### Research Source Priority
 1. **Ontario Lobbyist Registry** — filter by Premier's Office / Finance Ministry, 2018–present. Pull `Lobbyist Name` + `Client Company`.
@@ -279,27 +329,34 @@ app/
       PersonCard.tsx                # Shared card (carousel + gallery)
       PersonBadge.tsx               # Connection type badge
   admin/
-    components/
-      PeoplePanel.tsx               # Admin panel component (follows existing admin/components/ convention)
-  admin/
     page.tsx                        # MODIFIED: add PeoplePanel
+    components/
+      PeoplePanel.tsx               # Admin panel (follows existing admin/components/ convention)
   api/
     admin/
       people/
-        route.ts                    # GET list, POST create
+        route.ts                    # GET list, POST create (raw Prisma — no confidence filter)
         [id]/
           route.ts                  # GET, PATCH, DELETE
           connections/
-            route.ts                # POST add, DELETE remove
+            route.ts                # POST add, DELETE remove (connection id in body)
           sources/
-            route.ts                # POST add, DELETE remove
+            route.ts                # POST add, DELETE remove (source id in body)
 
 lib/
-  people.ts                         # Public-safe query helpers
+  people.ts                         # Public-safe helpers ONLY (confidence + published baked in)
+                                    # Admin routes use lib/db.ts (prisma) directly — never this file
+
+data/
+  people.ts                         # Seed data: exported PEOPLE_DATA array of PersonSeedRecord objects
 
 prisma/
   schema.prisma                     # ADD: Person, PersonConnection, PersonSource, Confidence enum
 
+public/
+  people/
+    [slug].jpg                      # Person photos — manually placed, resolved at render time
+
 scripts/
-  seed-person-[name].ts             # One per individual (initial research dump)
+  seed-people.ts                    # Single importer: loops PEOPLE_DATA, slug-check + insert
 ```
