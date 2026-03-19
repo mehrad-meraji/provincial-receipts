@@ -69,7 +69,18 @@ export default async function PeoplePage({ searchParams }: Props) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
             {people.map(person => (
-              <PersonCard key={person.slug} person={person} width={160} height={200} />
+              <PersonCard
+                key={person.slug}
+                person={{
+                  slug: person.slug,
+                  name: person.name,
+                  photo_filename: person.photo_filename,
+                  organization: person.organization,
+                  primary_connection_type: person.connections[0]?.connection_type ?? null,
+                }}
+                width={160}
+                height={200}
+              />
             ))}
           </div>
         )}
