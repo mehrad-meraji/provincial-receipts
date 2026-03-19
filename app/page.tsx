@@ -57,7 +57,7 @@ export default async function HomePage() {
         {/* Scandals Section */}
         {recentScandals.length > 0 && (
           <section>
-            <h1 className="mb-6 text-md uppercase font-bold text-zinc-500 dark:text-zinc-400">Documented Scandals</h1>
+            <h1 className="mb-6 text-md uppercase font-bold dark:text-zinc-400 text-zinc-600">Documented Scandals</h1>
             <div className="relative pl-6">
               <div className="absolute left-2 top-1 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800" />
               {(() => {
@@ -127,7 +127,7 @@ export default async function HomePage() {
                     nodes.push(
                       <div key={`year-${year}`} className="relative mb-6 -ml-1">
                         <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-4 h-px bg-zinc-300 dark:bg-zinc-600" />
-                        <span className="ml-2 font-mono text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                        <span className="ml-2 font-mono text-xs font-bold dark:text-zinc-400 text-zinc-600 uppercase tracking-widest">
                           {year}
                         </span>
                       </div>
@@ -148,19 +148,19 @@ export default async function HomePage() {
                     nodes.push(
                       <div key={scandal.id} className="relative mb-8">
                         <div className="absolute -left-4.75 top-1 w-2 h-2 rounded-full bg-zinc-950 dark:bg-white" />
-                        <p className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-widest mb-2">{dateLabel}</p>
+                        <p className="font-mono text-[10px] dark:text-zinc-400 text-zinc-600 uppercase tracking-widest mb-2">{dateLabel}</p>
                         <Link
                           href={`/scandals/${scandal.slug}`}
                           className="block border border-zinc-200 dark:border-zinc-800 p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                         >
                           <h2 className="font-serif text-lg font-bold text-zinc-950 dark:text-white">{scandal.title}</h2>
-                          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-3">
+                          <p className="text-sm dark:text-zinc-400 text-zinc-600 mt-1 line-clamp-3">
                             {scandal.tldr || scandal.summary.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()}
                           </p>
                           {badges.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-3">
                               {badges.map(b => (
-                                <span key={b.label} className="font-mono text-[10px] text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5">
+                                <span key={b.label} className="font-mono text-[10px] dark:text-zinc-400 text-zinc-600 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5">
                                   {b.count} {b.label}
                                 </span>
                               ))}
@@ -172,7 +172,7 @@ export default async function HomePage() {
                   } else {
                     const inner = (
                       <div className="flex items-center gap-2 py-1">
-                        <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400">
+                        <span className="font-mono text-[10px] uppercase tracking-widest dark:text-zinc-400 text-zinc-600">
                           {item.date.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })}
                           {' — '}{item.label}
                         </span>
@@ -180,7 +180,7 @@ export default async function HomePage() {
                     )
                     nodes.push(
                       <div key={`evt-${item.label}-${item.date.toISOString()}`} className="relative mb-6">
-                        <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border-2 text-zinc-400 bg-white dark:bg-zinc-950" />
+                        <div className="absolute -left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border-2 dark:text-zinc-400 text-zinc-600 bg-white dark:bg-zinc-950" />
                         {item.url
                           ? item.url.startsWith('/')
                             ? <Link href={item.url} className="hover:opacity-75 transition-opacity">{inner}</Link>
@@ -205,7 +205,7 @@ export default async function HomePage() {
         {/*</section>*/}
       </div>
 
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-12 py-6 text-center text-xs text-zinc-400 dark:text-zinc-600 font-mono">
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-12 py-6 text-center text-xs dark:text-zinc-400 text-zinc-600 font-mono">
         <p>Data sourced from Ontario Legislative Assembly · Updated every 6 hours</p>
         <p className="mt-1">This is a civic transparency project. Not affiliated with the Government of Ontario.</p>
       </footer>
