@@ -6,6 +6,11 @@ import { getPersonBySlug } from '@/lib/people'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonBadge from '@/app/components/people/PersonBadge'
 
+function safeUrl(url: string | null | undefined): string {
+  if (!url) return '#'
+  return /^https?:\/\//i.test(url) ? url : '#'
+}
+
 interface Props {
   params: Promise<{ slug: string }>
 }
@@ -79,7 +84,7 @@ export default async function PersonPage({ params }: Props) {
             {person.organization && (
               <p className="font-mono text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                 {person.organization_url ? (
-                  <a href={person.organization_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                  <a href={safeUrl(person.organization_url)} target="_blank" rel="noopener noreferrer" className="hover:underline">
                     {person.organization}
                   </a>
                 ) : person.organization}
@@ -139,7 +144,7 @@ export default async function PersonPage({ params }: Props) {
                     {sources.map(s => (
                       <li key={s.id}>
                         <a
-                          href={s.url}
+                          href={safeUrl(s.url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-zinc-700 dark:text-zinc-300 hover:underline"

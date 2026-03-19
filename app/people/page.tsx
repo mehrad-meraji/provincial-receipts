@@ -22,7 +22,10 @@ export default async function PeoplePage({ searchParams }: Props) {
   if (!flags.named_individuals_enabled) notFound()
 
   const { type } = await searchParams
-  const people = await getPeople(type ? { connection_type: type } : undefined)
+  const validType = type && (CONNECTION_TYPES as readonly string[]).includes(type)
+    ? (type as typeof CONNECTION_TYPES[number])
+    : undefined
+  const people = await getPeople(validType ? { connection_type: validType } : undefined)
 
   return (
     <main className="min-h-screen">
