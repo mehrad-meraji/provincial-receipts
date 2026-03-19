@@ -96,7 +96,7 @@ Photos are stored locally in the Next.js project at `public/people/[filename]`. 
 
 **In the admin form:** `photo_filename` is a plain text input (just the filename). Admin is responsible for placing the file in `public/people/` via the repo. A future enhancement could add file upload, but that's out of scope for this spec.
 
-**At render time:** `PersonCard.tsx` and the detail page resolve the path as `/people/${photo_filename}` and pass it to `<Image>` with appropriate `width`/`height` and `alt`. If `photo_filename` is null, the redacted placeholder renders instead.
+**At render time:** `PersonCard.tsx` and the detail page resolve the path as `/people/${photo_filename}` and pass it to `<Image>` with concrete `width` and `height` props (not `fill`) — card sizes are fixed so dimensions are known at build time. If `photo_filename` is null, the redacted placeholder renders instead.
 
 **`next.config` note:** No `remotePatterns` needed — all images are local.
 
@@ -124,6 +124,8 @@ getPeopleForCarousel(): Promise<PersonCardData[]>
 `PersonCardData` is a slim projection: `slug`, `name`, `photo_filename`, `organization`, `primary_connection_type`.
 
 **Defining "primary" connection type:** The card and carousel show a single badge. Primary is the first `PersonConnection` by `createdAt` ascending — the earliest-added connection is treated as primary. The admin controls this implicitly by the order in which connections are added. This is simple and deterministic; no priority ranking between types is needed.
+
+**Query implementation note:** `primary_connection_type` is not a DB column — it is computed in `getPeopleForCarousel()` and `getPeople()` by including `connections: { orderBy: { createdAt: 'asc' }, take: 1 }` in the Prisma query and mapping `connections[0]?.connection_type` to `primary_connection_type` in the helper. The raw `connections` array is not exposed on `PersonCardData`.
 
 **Admin routes** import `prisma` from `lib/db.ts` directly and apply no confidence filter. This is the same pattern used by all other admin routes in the codebase (e.g. `/api/admin/scandals/route.ts`). There is no `lib/admin/people.ts` — admin uses raw Prisma, public uses `lib/people.ts`. These two paths never share a function.
 
@@ -172,6 +174,8 @@ The existing admin is a single consolidated page at `app/admin/page.tsx` with pa
 
 **Component pattern:** `PeoplePanel` is a `'use client'` self-fetching component — it fetches its own data via `GET /api/admin/people` on mount, same pattern as `ScandalsPanel`. `app/admin/page.tsx` requires no changes beyond importing and rendering `<PeoplePanel />`.
 
+**Implementation warning:** Several other admin panels (`TimelineEventsPanel`, `ReportsPanel`, `ScandalQueue`) receive pre-fetched data as props from the server page. Do not follow that pattern for `PeoplePanel` — use the self-fetching `ScandalsPanel` pattern instead.
+
 ### `app/admin/components/PeoplePanel.tsx`
 - Table listing all people including `low` confidence (admin sees everything)
 - Columns: name, organization, confidence badge, published toggle, edit button
@@ -196,9 +200,15 @@ Fields: name, slug (auto-generated from name, editable), bio, photo_filename (fi
 
 **`app/api/admin/people/[id]/route.ts`** — `GET` (single), `PATCH` (update), `DELETE` (delete person + cascade)
 
-**`app/api/admin/people/[id]/connections/route.ts`** — `POST` (add connection), `DELETE` (remove connection by id)
+**`app/api/admin/people/[id]/connections/[connectionId]/route.ts`** — `DELETE` (remove by id in URL path)
 
-**`app/api/admin/people/[id]/sources/route.ts`** — `POST` (add source), `DELETE` (remove source by id)
+**`app/api/admin/people/[id]/connections/route.ts`** — `POST` (add connection)
+
+**`app/api/admin/people/[id]/sources/[sourceId]/route.ts`** — `DELETE` (remove by id in URL path)
+
+**`app/api/admin/people/[id]/sources/route.ts`** — `POST` (add source)
+
+Connection and source deletes use URL path params (`[connectionId]`, `[sourceId]`) not request body — consistent with the existing `/api/admin/[entity]/[id]/route.ts` pattern and avoids HTTP client body-stripping issues.
 
 All admin routes protected by Clerk `auth()` check, same pattern as existing admin routes.
 
@@ -244,8 +254,11 @@ All person photos receive a permanent newsprint comic filter — no hover lift, 
 ### Where it lives
 Single definition in `app/globals.css`. No component-specific CSS, no duplication. Any future use of person photos automatically gets the treatment by applying the wrapper class.
 
-### Dark mode note
-`mix-blend-mode: multiply` is invisible on dark backgrounds. In a `@media (prefers-color-scheme: dark)` block, the `::after` blend mode should switch to `overlay`, which works correctly on both light and dark canvases. Implementer must test both modes.
+### Dark mode requirement
+`mix-blend-mode: multiply` is invisible on dark backgrounds. The `::after` blend mode **must** switch to `overlay` in a `@media (prefers-color-scheme: dark)` block. Testing both light and dark modes is a required acceptance criterion for this feature — not optional polish.
+
+### Accessibility requirement
+The carousel auto-scroll animation must respect `prefers-reduced-motion`. Wrap the animation declaration in `@media (prefers-reduced-motion: no-preference)` so it only runs for users who have not opted out of motion.
 
 ---
 
@@ -349,9 +362,13 @@ app/
         [id]/
           route.ts                  # GET, PATCH, DELETE
           connections/
-            route.ts                # POST add, DELETE remove (connection id in body)
+            route.ts                # POST add connection
+            [connectionId]/
+              route.ts              # DELETE remove connection
           sources/
-            route.ts                # POST add, DELETE remove (source id in body)
+            route.ts                # POST add source
+            [sourceId]/
+              route.ts              # DELETE remove source
 
 lib/
   people.ts                         # Public-safe helpers ONLY (confidence + published baked in)
