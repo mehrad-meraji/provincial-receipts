@@ -155,6 +155,7 @@ model Scandal {
   news_links       ScandalNewsLink[]
   bills            Bill[]
   mpps             MPP[]
+  people           PersonConnection[]
 }
 
 model LegalAction {
@@ -209,4 +210,61 @@ model TimelineEvent {
   published   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Feature flags — singleton row (id always "singleton")
+model SiteConfig {
+  id                        String  @id @default("singleton")
+  named_individuals_enabled Boolean @default(false)
+}
+
+enum Confidence {
+  high
+  medium
+  low
+}
+
+model Person {
+  id               String             @id @default(cuid())
+  slug             String             @unique
+  name             String
+  bio              String?
+  photo_filename   String?
+  organization     String?
+  organization_url String?
+  confidence       Confidence
+  published        Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  connections      PersonConnection[]
+  sources          PersonSource[]
+}
+
+model PersonConnection {
+  id              String   @id @default(cuid())
+  person          Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId        String
+  scandal         Scandal  @relation(fields: [scandalId], references: [id], onDelete: Restrict)
+  scandalId       String
+  connection_type String
+  description     String
+  createdAt       DateTime @default(now())
+
+  @@unique([personId, scandalId, connection_type])
+  @@index([personId])
+  @@index([scandalId])
+}
+
+model PersonSource {
+  id          String   @id @default(cuid())
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  personId    String
+  url         String
+  title       String
+  source_type String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([personId, url])
+  @@index([personId])
 }
