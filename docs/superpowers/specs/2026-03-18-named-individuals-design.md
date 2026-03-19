@@ -119,9 +119,11 @@ getPersonBySlug(slug: string): Promise<PersonWithDetails | null>
 getPeopleForCarousel(): Promise<PersonCardData[]>
 ```
 
-`PersonWithConnections` includes: all Person fields + `connections[]` (with scandal title, slug, tldr) + primary `connection_type` badge.
+`PersonWithConnections` includes: all Person fields + `connections[]` (with scandal title, slug, tldr).
 `PersonWithDetails` includes: all Person fields + `connections[]` (full scandal join) + `sources[]`.
-`PersonCardData` is a slim projection: `slug`, `name`, `photo_filename`, `organization`, primary `connection_type`.
+`PersonCardData` is a slim projection: `slug`, `name`, `photo_filename`, `organization`, `primary_connection_type`.
+
+**Defining "primary" connection type:** The card and carousel show a single badge. Primary is the first `PersonConnection` by `createdAt` ascending — the earliest-added connection is treated as primary. The admin controls this implicitly by the order in which connections are added. This is simple and deterministic; no priority ranking between types is needed.
 
 **Admin routes** import `prisma` from `lib/db.ts` directly and apply no confidence filter. This is the same pattern used by all other admin routes in the codebase (e.g. `/api/admin/scandals/route.ts`). There is no `lib/admin/people.ts` — admin uses raw Prisma, public uses `lib/people.ts`. These two paths never share a function.
 
@@ -168,14 +170,16 @@ Small colored pill for connection type. Props: `connection_type: string`. Return
 
 The existing admin is a single consolidated page at `app/admin/page.tsx` with panels per entity. A new `PeoplePanel` component is added to this page.
 
-### `app/components/admin/PeoplePanel.tsx`
+**Component pattern:** `PeoplePanel` is a `'use client'` self-fetching component — it fetches its own data via `GET /api/admin/people` on mount, same pattern as `ScandalsPanel`. `app/admin/page.tsx` requires no changes beyond importing and rendering `<PeoplePanel />`.
+
+### `app/admin/components/PeoplePanel.tsx`
 - Table listing all people including `low` confidence (admin sees everything)
 - Columns: name, organization, confidence badge, published toggle, edit button
 - "Add Person" button opens inline create form
 - Edit opens inline edit form
 
 ### Admin Form — create/edit
-Fields: name, slug (auto-generated from name, editable), bio, photo_url, organization, organization_url, confidence selector, published toggle.
+Fields: name, slug (auto-generated from name, editable), bio, photo_filename (filename only, e.g. `john-doe.jpg`), organization, organization_url, confidence selector, published toggle.
 
 **Connecting to scandals:**
 - Search box (calls `GET /api/admin/scandals?q=` — existing endpoint) returns matching scandals
@@ -257,7 +261,8 @@ People seeds use a **data + importer** pattern rather than one script per person
 
 ### Structure
 
-**`data/people.ts`** — the data file. An exported array of typed person objects:
+**`scripts/people-data.ts`** — the data file, colocated with the importer in `scripts/`. An exported array of typed person objects. No new top-level directory is introduced.
+
 ```ts
 export const PEOPLE_DATA: PersonSeedRecord[] = [
   {
@@ -287,13 +292,18 @@ export const PEOPLE_DATA: PersonSeedRecord[] = [
 ]
 ```
 
-**`scripts/seed-people.ts`** — the single importer. Loops over `PEOPLE_DATA`, runs the same slug-check + insert pattern as scandal seeds using the `neon()` HTTP driver. Idempotent: skips existing slugs, upserts connections using the `@@unique` constraint.
+**`scripts/seed-people.ts`** — the single importer. Uses **Prisma Client** (via `lib/db.ts`) rather than the raw `neon()` SQL driver. Reason: the `Confidence` field is a Prisma enum — raw SQL inserts require casting (`${confidence}::"Confidence"`), adding friction and a foot-gun. Prisma Client handles the enum type transparently. This is a deliberate departure from existing scandal seeds, which predate the `lib/db.ts` pattern and use raw SQL for HTML-heavy content. Person seeds have no such requirement.
+
+**Idempotency strategy:**
+- Person: slug-check first, skip if exists (same as existing seeds)
+- `PersonConnection`: `createMany` with `skipDuplicates: true` — leverages the `@@unique([personId, scandalId, connection_type])` constraint. No manual pre-check needed.
+- `PersonSource`: `createMany` with `skipDuplicates: true` on `(personId, url)` — add this compound unique constraint to the schema.
 
 ### Why this pattern
-- Adding a new person = one new object in `data/people.ts`, no new file
+- Adding a new person = one new object in `scripts/people-data.ts`, no new file
 - The seed logic lives in one place and is tested once
 - The data file is easy to review, diff, and search
-- Still uses the same `neon()` HTTP driver as all other seeds — no new infrastructure
+- Prisma Client eliminates the enum cast problem entirely
 
 ### Research Source Priority
 1. **Ontario Lobbyist Registry** — filter by Premier's Office / Finance Ministry, 2018–present. Pull `Lobbyist Name` + `Client Company`.
@@ -347,16 +357,16 @@ lib/
   people.ts                         # Public-safe helpers ONLY (confidence + published baked in)
                                     # Admin routes use lib/db.ts (prisma) directly — never this file
 
-data/
-  people.ts                         # Seed data: exported PEOPLE_DATA array of PersonSeedRecord objects
-
 prisma/
   schema.prisma                     # ADD: Person, PersonConnection, PersonSource, Confidence enum
+                                    # ADD: @@unique([personId, scandalId, connection_type]) on PersonConnection
+                                    # ADD: @@unique([personId, url]) on PersonSource
 
 public/
   people/
     [slug].jpg                      # Person photos — manually placed, resolved at render time
 
 scripts/
-  seed-people.ts                    # Single importer: loops PEOPLE_DATA, slug-check + insert
+  people-data.ts                    # Seed data: exported PEOPLE_DATA array of PersonSeedRecord objects
+  seed-people.ts                    # Single importer: Prisma Client, slug-check + createMany skipDuplicates
 ```
