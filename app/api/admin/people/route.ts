@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/db'
-import { Confidence } from '@prisma/client'
+import { Confidence, Prisma } from '@prisma/client'
 
 function slugify(name: string): string {
   return name
@@ -56,18 +56,24 @@ export async function POST(req: NextRequest) {
 
   const slug = body.slug?.trim() || slugify(body.name.trim())
 
-  const person = await prisma.person.create({
-    data: {
-      name: body.name.trim(),
-      slug,
-      bio: body.bio?.trim() || null,
-      photo_filename: body.photo_filename?.trim() || null,
-      organization: body.organization?.trim() || null,
-      organization_url: body.organization_url?.trim() || null,
-      confidence: body.confidence as Confidence,
-      published: body.published ?? false,
-    },
-  })
-
-  return NextResponse.json(person, { status: 201 })
+  try {
+    const person = await prisma.person.create({
+      data: {
+        name: body.name.trim(),
+        slug,
+        bio: body.bio?.trim() || null,
+        photo_filename: body.photo_filename?.trim() || null,
+        organization: body.organization?.trim() || null,
+        organization_url: body.organization_url?.trim() || null,
+        confidence: body.confidence as Confidence,
+        published: body.published ?? false,
+      },
+    })
+    return NextResponse.json(person, { status: 201 })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json({ error: 'A person with that slug already exists' }, { status: 409 })
+    }
+    throw err
+  }
 }

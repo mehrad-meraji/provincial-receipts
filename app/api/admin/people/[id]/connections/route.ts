@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -19,15 +20,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'scandalId, connection_type, and description are required' }, { status: 400 })
   }
 
-  const connection = await prisma.personConnection.create({
-    data: {
-      personId,
-      scandalId: body.scandalId,
-      connection_type: body.connection_type,
-      description: body.description.trim(),
-    },
-    include: { scandal: { select: { id: true, title: true, slug: true } } },
-  })
-
-  return NextResponse.json(connection, { status: 201 })
+  try {
+    const connection = await prisma.personConnection.create({
+      data: {
+        personId,
+        scandalId: body.scandalId,
+        connection_type: body.connection_type,
+        description: body.description.trim(),
+      },
+      include: { scandal: { select: { id: true, title: true, slug: true } } },
+    })
+    return NextResponse.json(connection, { status: 201 })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return NextResponse.json({ error: 'This connection already exists' }, { status: 409 })
+    }
+    throw err
+  }
 }
