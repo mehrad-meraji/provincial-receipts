@@ -86,9 +86,10 @@
     }
   }
 
-  /* Carousel keyframes — defined at top level (Lightning CSS / Tailwind v4 does not support
-     @keyframes nested inside @media). The animation is only applied inside the
-     prefers-reduced-motion media query below, so it never runs for users who opt out. */
+  /* Carousel keyframes — defined at layer level, not inside @media
+     (Lightning CSS / Tailwind v4 does not support @keyframes nested inside @media).
+     The animation is only applied inside the prefers-reduced-motion media query below,
+     so it never runs for users who opt out. */
   @keyframes carousel-scroll {
     from { transform: translateX(0); }
     to   { transform: translateX(-50%); }
