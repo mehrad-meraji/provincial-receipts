@@ -6,6 +6,8 @@ import { getPersonBySlug } from '@/lib/people'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonBadge from '@/app/components/people/PersonBadge'
 
+export const dynamic = 'force-dynamic'
+
 function safeUrl(url: string | null | undefined): string {
   if (!url) return '#'
   return /^https?:\/\//i.test(url) ? url : '#'

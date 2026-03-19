@@ -20,6 +20,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'url, title, and source_type are required' }, { status: 400 })
   }
 
+  const VALID_SOURCE_TYPES = ['Registry', 'News', 'Corporate', 'Court', 'FOI']
+  if (!VALID_SOURCE_TYPES.includes(body.source_type)) {
+    return NextResponse.json({ error: `source_type must be one of: ${VALID_SOURCE_TYPES.join(', ')}` }, { status: 400 })
+  }
+
   try {
     const source = await prisma.personSource.create({
       data: {

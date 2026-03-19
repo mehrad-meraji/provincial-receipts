@@ -10,11 +10,13 @@ interface SiteConfig {
 export default function FeatureFlagsPanel() {
   const [config, setConfig] = useState<SiteConfig | null>(null)
   const [saving, setSaving] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/site-config')
       .then(r => r.json())
       .then(setConfig)
+      .catch(() => setFetchError('Failed to load config'))
   }, [])
 
   async function toggle(flag: keyof Omit<SiteConfig, 'id'>) {
@@ -31,6 +33,10 @@ export default function FeatureFlagsPanel() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (fetchError) {
+    return <p className="font-mono text-xs text-red-600">{fetchError}</p>
   }
 
   if (!config) {

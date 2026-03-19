@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
 
   const slug = body.slug?.trim() || slugify(body.name.trim())
 
+  if (body.photo_filename?.trim() && !/^[a-zA-Z0-9._-]+$/.test(body.photo_filename.trim())) {
+    return NextResponse.json({ error: 'photo_filename must contain only letters, numbers, dots, underscores, or hyphens' }, { status: 400 })
+  }
+
   try {
     const person = await prisma.person.create({
       data: {

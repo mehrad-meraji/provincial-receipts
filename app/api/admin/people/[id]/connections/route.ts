@@ -20,6 +20,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'scandalId, connection_type, and description are required' }, { status: 400 })
   }
 
+  const VALID_CONNECTION_TYPES = ['Lobbyist', 'Donor', 'Director', 'Beneficiary']
+  if (!VALID_CONNECTION_TYPES.includes(body.connection_type)) {
+    return NextResponse.json({ error: `connection_type must be one of: ${VALID_CONNECTION_TYPES.join(', ')}` }, { status: 400 })
+  }
+
   try {
     const connection = await prisma.personConnection.create({
       data: {
@@ -32,8 +37,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     })
     return NextResponse.json(connection, { status: 201 })
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return NextResponse.json({ error: 'This connection already exists' }, { status: 409 })
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') return NextResponse.json({ error: 'This connection already exists' }, { status: 409 })
+      if (err.code === 'P2003') return NextResponse.json({ error: 'Person or scandal not found' }, { status: 422 })
     }
     throw err
   }

@@ -55,6 +55,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'slug cannot be empty' }, { status: 400 })
   }
 
+  if (body.photo_filename !== undefined && body.photo_filename !== null && body.photo_filename.trim() && !/^[a-zA-Z0-9._-]+$/.test(body.photo_filename.trim())) {
+    return NextResponse.json({ error: 'photo_filename must contain only letters, numbers, dots, underscores, or hyphens' }, { status: 400 })
+  }
+
   try {
     const person = await prisma.person.update({
       where: { id },
