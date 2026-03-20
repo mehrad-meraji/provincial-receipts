@@ -86,7 +86,7 @@ export default async function HomePage() {
         {/* Scandals Section */}
         {recentScandals.length > 0 && (
           <section>
-            <h1 className="mb-6 text-md uppercase font-bold dark:text-zinc-400 text-zinc-600">Documented Scandals</h1>
+            <h1 className="mb-6 font-mono tracking-wider uppercase dark:text-zinc-400 text-zinc-600">Documented Scandals</h1>
             <div className="relative pl-6">
               <div className="absolute left-2 top-1 bottom-0 w-px bg-zinc-200 dark:bg-zinc-800" />
               {(() => {

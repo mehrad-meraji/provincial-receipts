@@ -25,7 +25,7 @@ export default function PeopleCarousel({ people }: PeopleCarouselProps) {
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-md uppercase font-bold dark:text-zinc-400 text-zinc-600">
+        <h2 className="text-base font-mono tracking-wider uppercase dark:text-zinc-400 text-zinc-600">
           Doug&apos;s Friends & Accomplices
         </h2>
         <Link
