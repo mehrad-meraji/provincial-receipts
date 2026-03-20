@@ -1,14 +1,23 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
-import { getPeople } from '@/lib/people'
+import { getPeople, toPersonCardData } from '@/lib/people'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonCard from '@/app/components/people/PersonCard'
+import Masthead from '@/app/components/layout/Masthead'
+import DatelineBar from '@/app/components/layout/DatelineBar'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'People Connected to Ford Government Payouts',
+  description: "Individuals connected to Doug Ford's Ontario government through contracts, donations, appointments, and financial benefits. Documented with sources.",
+  keywords: ['Ford government connections', 'Ontario government contracts', 'Doug Ford donors', 'Ontario lobbyists', 'Ford government payouts', 'Ontario political connections'],
+  openGraph: {
+    title: 'People Connected to Ford Government Payouts | Fuck Doug Ford',
+    description: "Individuals connected to Doug Ford's Ontario government through contracts, donations, appointments, and financial benefits.",
+    url: 'https://fuckdougford.ca/people',
+  },
 }
 
 const CONNECTION_TYPES = ['Lobbyist', 'Donor', 'Director', 'Beneficiary'] as const
@@ -29,6 +38,8 @@ export default async function PeoplePage({ searchParams }: Props) {
 
   return (
     <main className="min-h-screen">
+      <DatelineBar />
+      <Masthead />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <h1 className="font-mono text-sm uppercase tracking-widest font-bold text-zinc-950 dark:text-white mb-2">
           Connected Individuals
@@ -74,15 +85,7 @@ export default async function PeoplePage({ searchParams }: Props) {
             {people.map(person => (
               <PersonCard
                 key={person.slug}
-                person={{
-                  slug: person.slug,
-                  name: person.name,
-                  photo_filename: person.photo_filename,
-                  organization: person.organization,
-                  primary_connection_type: person.connections[0]?.connection_type ?? null,
-                }}
-                width={160}
-                height={200}
+                person={toPersonCardData(person)}
               />
             ))}
           </div>

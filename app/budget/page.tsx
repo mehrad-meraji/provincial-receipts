@@ -1,11 +1,29 @@
+import type { Metadata } from 'next'
 import { prisma } from '@/lib/db'
 import Masthead from '@/app/components/layout/Masthead'
 import DatelineBar from '@/app/components/layout/DatelineBar'
 import SectionDivider from '@/app/components/layout/SectionDivider'
 import BudgetSummaryBar from '@/app/components/budget/BudgetSummaryBar'
 import MinistryTable from '@/app/components/budget/MinistryTable'
+import ServiceCutsPanel from '@/app/components/budget/ServiceCutsPanel'
+import DebtBreakdownPanel from '@/app/components/budget/DebtBreakdownPanel'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Ontario Budget & Service Cuts',
+  description: "Doug Ford's Ontario government budget breakdown: $46B+ in documented public service cuts to healthcare, education, and social services since 2018, plus $1T+ in total provincial obligations.",
+  keywords: ['Ontario budget', 'Doug Ford cuts', 'Ontario deficit', 'Ontario debt', 'healthcare cuts Ontario', 'education cuts Ontario', 'FAO Ontario', 'Ontario public services'],
+  openGraph: {
+    title: 'Ontario Budget & Service Cuts | Fuck Doug Ford',
+    description: "$46B+ in documented public service cuts and $1T+ in total obligations under Doug Ford's Ontario government.",
+    url: 'https://fuckdougford.ca/budget',
+  },
+  twitter: {
+    title: 'Ontario Budget & Service Cuts | Fuck Doug Ford',
+    description: "$46B+ in documented public service cuts and $1T+ in total obligations under Doug Ford's Ontario government.",
+  },
+}
 
 export default async function BudgetPage() {
   const snapshot = await prisma.budgetSnapshot.findFirst({
@@ -24,6 +42,16 @@ export default async function BudgetPage() {
       <Masthead />
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
+        <section>
+          <SectionDivider label="Cuts to Public Services Since 2018" />
+          <ServiceCutsPanel />
+        </section>
+
+        <section>
+          <SectionDivider label="Total Estimated Obligations" />
+          <DebtBreakdownPanel />
+        </section>
+
         {snapshot ? (
           <>
             <section>

@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { getPersonBySlug } from '@/lib/people'
 import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonBadge from '@/app/components/people/PersonBadge'
+import Masthead from '@/app/components/layout/Masthead'
+import DatelineBar from '@/app/components/layout/DatelineBar'
+import { formatBudgetAmount } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +25,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!flags.named_individuals_enabled) return { title: 'Not Found' }
   const person = await getPersonBySlug(slug)
   if (!person) return { title: 'Not Found' }
-  return { title: `${person.name} — Ford Government Connections` }
+  const description = person.bio ?? `${person.name}'s documented connections to Doug Ford's Ontario government, including contracts, donations, appointments, and financial benefits.`
+  return {
+    title: `${person.name} — Ford Government Connections`,
+    description,
+    openGraph: {
+      title: `${person.name} | Fuck Doug Ford`,
+      description,
+      url: `https://fuckdougford.ca/people/${slug}`,
+    },
+  }
 }
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
@@ -41,6 +53,17 @@ export default async function PersonPage({ params }: Props) {
 
   const uniqueConnectionTypes = [...new Set(person.connections.map(c => c.connection_type))]
 
+  // Sum costs of connected scandals that have a cost_to_ontario value
+  const totalCostCents = person.connections.reduce<bigint>((sum, c) => {
+    return c.scandal.cost_to_ontario ? sum + c.scandal.cost_to_ontario : sum
+  }, 0n)
+  const hasCost = totalCostCents > 0n
+  // Use ">$X" prefix if any connected scandal has a ">" in its label (i.e. minimum estimate)
+  const isMinimum = person.connections.some(c => c.scandal.cost_label?.startsWith('>'))
+  const totalCostFormatted = hasCost
+    ? `${isMinimum ? '>' : ''}${formatBudgetAmount(totalCostCents)}`
+    : null
+
   // Group sources by type
   const sourcesByType = person.sources.reduce<Record<string, typeof person.sources>>((acc, s) => {
     const key = s.source_type
@@ -51,6 +74,8 @@ export default async function PersonPage({ params }: Props) {
 
   return (
     <main className="min-h-screen">
+      <DatelineBar />
+      <Masthead />
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {/* Back link */}
@@ -98,6 +123,12 @@ export default async function PersonPage({ params }: Props) {
                 <PersonBadge key={ct} connection_type={ct} />
               ))}
             </div>
+            {totalCostFormatted && (
+              <div className="border border-red-800/40 bg-red-950/20 px-3 py-2 mb-3">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-red-500/80 mb-0.5">Estimated cost to Ontario</p>
+                <p className="font-mono text-xl font-bold text-red-500">{totalCostFormatted}</p>
+              </div>
+            )}
             {person.bio && (
               <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{person.bio}</p>
             )}
@@ -116,12 +147,19 @@ export default async function PersonPage({ params }: Props) {
                   <div className="flex items-start gap-3 mb-2">
                     <PersonBadge connection_type={conn.connection_type} />
                   </div>
-                  <Link
-                    href={`/scandals/${conn.scandal.slug}`}
-                    className="font-serif text-base font-bold text-zinc-950 dark:text-white hover:underline block mb-1"
-                  >
-                    {conn.scandal.title}
-                  </Link>
+                  <div className="flex items-start justify-between gap-4 mb-1">
+                    <Link
+                      href={`/scandals/${conn.scandal.slug}`}
+                      className="font-serif text-base font-bold text-zinc-950 dark:text-white hover:underline"
+                    >
+                      {conn.scandal.title}
+                    </Link>
+                    {conn.scandal.cost_label && (
+                      <span className="flex-none font-mono text-sm font-bold text-red-500 whitespace-nowrap">
+                        {conn.scandal.cost_label}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-2">{conn.scandal.tldr}</p>
                   <p className="font-mono text-[10px] text-zinc-500 dark:text-zinc-500">{conn.description}</p>
                 </div>

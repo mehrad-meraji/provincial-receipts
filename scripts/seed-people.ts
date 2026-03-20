@@ -8,6 +8,8 @@
  * Idempotent: skips existing slugs, uses createMany with skipDuplicates for connections/sources.
  */
 
+import { neonConfig } from '@neondatabase/serverless'
+neonConfig.poolQueryViaFetch = true
 import { prisma } from '../lib/db'
 import { PEOPLE_DATA } from './people-data'
 
@@ -56,22 +58,28 @@ async function main() {
       )
       const validConnections = connectionData.filter((c): c is NonNullable<typeof c> => c !== null)
       if (validConnections.length > 0) {
-        await prisma.personConnection.createMany({ data: validConnections, skipDuplicates: true })
+        for (const conn of validConnections) {
+          try {
+            await prisma.personConnection.create({ data: conn })
+          } catch (e: any) {
+            if (e.code !== 'P2002') throw e // ignore duplicate, rethrow anything else
+          }
+        }
         console.log(`    ✓ ${validConnections.length} connection(s)`)
       }
     }
 
     // 4. Create sources
     if (record.sources.length > 0) {
-      await prisma.personSource.createMany({
-        data: record.sources.map(s => ({
-          personId: person.id,
-          url: s.url,
-          title: s.title,
-          source_type: s.source_type,
-        })),
-        skipDuplicates: true,
-      })
+      for (const s of record.sources) {
+        try {
+          await prisma.personSource.create({
+            data: { personId: person.id, url: s.url, title: s.title, source_type: s.source_type },
+          })
+        } catch (e: any) {
+          if (e.code !== 'P2002') throw e
+        }
+      }
       console.log(`    ✓ ${record.sources.length} source(s)`)
     }
   }

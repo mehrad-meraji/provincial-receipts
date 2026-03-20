@@ -1,5 +1,6 @@
-import { prisma } from '@/lib/db'
-import { Confidence } from '@prisma/client'
+import {prisma} from '@/lib/db'
+import {Confidence} from '@prisma/client'
+import {formatBudgetAmount} from '@/lib/format'
 
 const PUBLIC_WHERE = {
   confidence: { in: [Confidence.high, Confidence.medium] as Confidence[] },
@@ -14,6 +15,7 @@ export type PersonCardData = {
   photo_filename: string | null
   organization: string | null
   primary_connection_type: string | null
+  total_cost_label: string | null
 }
 
 export type PersonWithConnections = {
@@ -30,7 +32,7 @@ export type PersonWithConnections = {
     id: string
     connection_type: string
     description: string
-    scandal: { title: string; slug: string; tldr: string }
+    scandal: { title: string; slug: string; tldr: string; cost_to_ontario: bigint | null; cost_label: string | null }
   }[]
 }
 
@@ -45,19 +47,29 @@ export type PersonWithDetails = PersonWithConnections & {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function toCardData(person: {
+export function toPersonCardData(person: {
   slug: string
   name: string
   photo_filename: string | null
   organization: string | null
-  connections: { connection_type: string }[]
+  connections: { connection_type: string; scandal?: { cost_to_ontario: bigint | null; cost_label: string | null } | null }[]
 }): PersonCardData {
+  const totalCents = person.connections.reduce<bigint>(
+    (sum, c) => (c.scandal?.cost_to_ontario ? sum + c.scandal.cost_to_ontario : sum),
+    0n
+  )
+  const isMinimum = person.connections.some(c => c.scandal?.cost_label?.startsWith('>'))
+  const total_cost_label = totalCents > 0n
+    ? `${isMinimum ? '>' : ''}${formatBudgetAmount(totalCents)}`
+    : null
+
   return {
     slug: person.slug,
     name: person.name,
     photo_filename: person.photo_filename,
     organization: person.organization,
     primary_connection_type: person.connections[0]?.connection_type ?? null,
+    total_cost_label,
   }
 }
 
@@ -68,14 +80,14 @@ function toCardData(person: {
  * Optionally filtered by connection_type (exact match).
  */
 export async function getPeople(filter?: { connection_type?: string }): Promise<PersonWithConnections[]> {
-  const people = await prisma.person.findMany({
+  return await prisma.person.findMany({
     where: {
       ...PUBLIC_WHERE,
       ...(filter?.connection_type
-        ? { connections: { some: { connection_type: filter.connection_type } } }
+        ? {connections: {some: {connection_type: filter.connection_type}}}
         : {}),
     },
-    orderBy: { createdAt: 'desc' },
+    orderBy: {createdAt: 'desc'},
     select: {
       id: true,
       slug: true,
@@ -87,17 +99,16 @@ export async function getPeople(filter?: { connection_type?: string }): Promise<
       confidence: true,
       published: true,
       connections: {
-        orderBy: { createdAt: 'asc' },
+        orderBy: {createdAt: 'asc'},
         select: {
           id: true,
           connection_type: true,
           description: true,
-          scandal: { select: { title: true, slug: true, tldr: true } },
+          scandal: {select: {title: true, slug: true, tldr: true, cost_to_ontario: true, cost_label: true}},
         },
       },
     },
   })
-  return people
 }
 
 /**
@@ -123,7 +134,7 @@ export async function getPersonBySlug(slug: string): Promise<PersonWithDetails |
           id: true,
           connection_type: true,
           description: true,
-          scandal: { select: { title: true, slug: true, tldr: true } },
+          scandal: { select: { title: true, slug: true, tldr: true, cost_to_ontario: true, cost_label: true } },
         },
       },
       sources: {
@@ -156,10 +167,12 @@ export async function getPeopleForCarousel(): Promise<PersonCardData[]> {
       organization: true,
       connections: {
         orderBy: { createdAt: 'asc' },
-        take: 1,
-        select: { connection_type: true },
+        select: {
+          connection_type: true,
+          scandal: { select: { cost_to_ontario: true, cost_label: true } },
+        },
       },
     },
   })
-  return people.map(toCardData)
+  return people.map(toPersonCardData)
 }

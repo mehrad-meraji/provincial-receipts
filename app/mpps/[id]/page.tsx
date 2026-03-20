@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Bill } from '@prisma/client'
@@ -13,6 +14,25 @@ export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ id: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params
+  const mpp = await prisma.mPP.findUnique({
+    where: { id },
+    select: { name: true, party: true, riding: true },
+  })
+  if (!mpp) return {}
+  const description = `${mpp.name}, ${mpp.party} MPP for ${mpp.riding}. Track their bills, votes, and connections to Ford government scandals.`
+  return {
+    title: `${mpp.name} — ${mpp.riding} MPP`,
+    description,
+    openGraph: {
+      title: `${mpp.name} | Fuck Doug Ford`,
+      description,
+      url: `https://fuckdougford.ca/mpps/${id}`,
+    },
+  }
 }
 
 export default async function MPPPage({ params }: PageProps) {

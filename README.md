@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Fuck Doug Ford
 
-## Getting Started
+A civic accountability dashboard tracking Ontario government legislation, scandals, and the people connected to them during the Doug Ford administration.
 
-First, run the development server:
+## What This Is
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+This project aggregates and surfaces public information about Ontario's provincial government into a single, searchable platform. It tracks:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- **Bills** — Legislative actions with impact scoring and vote breakdowns
+- **Scandals** — Documented government controversies with sourced evidence, legal actions, and connected parties
+- **People** — Lobbyists, donors, directors, and beneficiaries linked to scandals
+- **MPPs** — Members of Provincial Parliament, their voting records, and scandal involvement
+- **Budget** — Ontario fiscal spending broken down by ministry and program
+- **News** — Automated aggregation and AI-assisted classification of Ontario political news
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How It Works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The platform automatically scrapes public data from the Ontario Legislative Assembly, Hansard transcripts, and major news outlets. News articles are classified using AI to identify relevance to tracked bills and scandals. An admin interface allows moderation and editorial control over published content.
 
-## Learn More
+All claims are backed by linked sources — news articles, court documents, and government records.
 
-To learn more about Next.js, take a look at the following resources:
+## Who It's For
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Citizens who want a clear picture of what their provincial government is doing
+- Journalists looking for aggregated, structured data on Ontario politics
+- Researchers studying legislative patterns and government accountability
+- Advocacy groups tracking specific policy areas
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Disclaimer
 
-## Deploy on Vercel
+This is an independent civic transparency project. It is not affiliated with the Government of Ontario or any political party.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+You are free to use, modify, and contribute to this project. If you run a modified version as a public web service, you must make your source code available under the same license. This prevents closed-source duplication while keeping the project open for community contributions.

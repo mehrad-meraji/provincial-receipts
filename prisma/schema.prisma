@@ -148,6 +148,8 @@ model Scandal {
   rippling_effects String
   date_reported    DateTime
   published        Boolean           @default(false)
+  cost_to_ontario  BigInt?
+  cost_label       String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   legal_actions    LegalAction[]

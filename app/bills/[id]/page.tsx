@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { ExternalLink } from 'lucide-react'
@@ -15,6 +16,25 @@ export const dynamic = 'force-dynamic'
 
 interface PageProps {
   params: Promise<{ id: string }>
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params
+  const bill = await prisma.bill.findUnique({
+    where: { id },
+    select: { bill_number: true, title: true, status: true, sponsor: true },
+  })
+  if (!bill) return {}
+  const description = `Ontario ${bill.bill_number}: ${bill.title}. Status: ${bill.status}. Sponsored by ${bill.sponsor}. Track this bill's progress and impact on Ontarians.`
+  return {
+    title: `${bill.bill_number} — ${bill.title}`,
+    description,
+    openGraph: {
+      title: `${bill.bill_number}: ${bill.title} | Fuck Doug Ford`,
+      description,
+      url: `https://fuckdougford.ca/bills/${id}`,
+    },
+  }
 }
 
 export default async function BillPage({ params }: PageProps) {

@@ -15,12 +15,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params
   const scandal = await prisma.scandal.findUnique({
     where: { slug },
-    select: { title: true, summary: true },
+    select: { title: true, tldr: true, summary: true },
   })
   if (!scandal) return {}
+  const description = scandal.tldr ?? scandal.summary.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200)
   return {
     title: scandal.title,
-    description: scandal.summary,
+    description,
+    openGraph: {
+      title: `${scandal.title} | Fuck Doug Ford`,
+      description,
+      url: `https://fuckdougford.ca/scandals/${slug}`,
+      type: 'article',
+    },
+    twitter: {
+      card: 'summary',
+      title: scandal.title,
+      description,
+    },
   }
 }
 

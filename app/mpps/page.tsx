@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { prisma } from '@/lib/db'
 import Masthead from '@/app/components/layout/Masthead'
 import DatelineBar from '@/app/components/layout/DatelineBar'
@@ -5,6 +6,17 @@ import SectionDivider from '@/app/components/layout/SectionDivider'
 import MPPCard from '@/app/components/mpps/MPPCard'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Ontario MPPs',
+  description: "All Ontario MPPs under Doug Ford's Conservative government. Track bills sponsored, votes cast, and connections to Ford government scandals by your representative.",
+  keywords: ['Ontario MPPs', 'Ontario politicians', 'Queen\'s Park MPP', 'Doug Ford MPPs', 'PC Ontario', 'Ontario Conservative MPP', 'Toronto MPP'],
+  openGraph: {
+    title: 'Ontario MPPs | Fuck Doug Ford',
+    description: "Track Ontario MPPs, their votes, bills sponsored, and connections to Ford government scandals.",
+    url: 'https://fuckdougford.ca/mpps',
+  },
+}
 
 export default async function MPPsPage() {
   const mpps = await prisma.mPP.findMany({

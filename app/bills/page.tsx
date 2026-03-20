@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { prisma } from '@/lib/db'
 import Masthead from '@/app/components/layout/Masthead'
 import DatelineBar from '@/app/components/layout/DatelineBar'
@@ -5,6 +6,17 @@ import SectionDivider from '@/app/components/layout/SectionDivider'
 import BillTable from '@/app/components/bills/BillTable'
 
 export const dynamic = 'force-dynamic'
+
+export const metadata: Metadata = {
+  title: 'Ontario Bills & Legislation',
+  description: "All Ontario government bills introduced under Doug Ford's Conservative government, ranked by impact. Track legislation affecting Toronto, healthcare, education, and housing.",
+  keywords: ['Ontario bills', 'Ontario legislation', 'Doug Ford bills', 'Queen\'s Park bills', 'Ontario legislature', 'Toronto bills', 'Ontario law'],
+  openGraph: {
+    title: 'Ontario Bills & Legislation | Fuck Doug Ford',
+    description: "All Ontario government bills under Doug Ford, ranked by impact on Ontarians.",
+    url: 'https://fuckdougford.ca/bills',
+  },
+}
 
 export default async function BillsPage() {
   const bills = await prisma.bill.findMany({

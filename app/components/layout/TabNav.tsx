@@ -5,8 +5,6 @@ import { usePathname } from 'next/navigation'
 
 const BASE_TABS = [
   { label: 'Home',   href: '/' },
-  { label: 'Bills',  href: '/bills' },
-  { label: 'MPPs',   href: '/mpps' },
   { label: 'Budget', href: '/budget' },
 ] as const
 

@@ -9,9 +9,10 @@ import {
   Newspaper, AlertTriangle, Flag, Gavel, Lock, Syringe,
   Vote, Megaphone, FileText, Globe, type LucideIcon,
 } from 'lucide-react'
+import KPIStrip from '@/app/components/bills/KPIStrip'
+import { formatBudgetAmount } from '@/lib/format'
 // import SectionDivider from './components/layout/SectionDivider'
 // import ScandalFeed from './components/news/ScandalFeed'
-// import KPIStrip from "@/app/components/bills/KPIStrip";
 
 // Always SSR — data changes with every cron run
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,7 @@ export default async function HomePage() {
     recentScandals,
     dbTimelineEvents,
     flags,
+    budgetSnapshot,
   ] = await Promise.all([
     // prisma.newsEvent.findMany({
     //   where: { hidden: false },
@@ -51,6 +53,10 @@ export default async function HomePage() {
       ?.findMany({ where: { published: true }, orderBy: { date: 'desc' } })
       .catch(() => []) ?? Promise.resolve([]),
     getFeatureFlags(),
+    prisma.budgetSnapshot.findFirst({
+      orderBy: { fiscal_year: 'desc' },
+      select: { deficit: true },
+    }),
   ])
 
   const carouselPeople = flags.named_individuals_enabled
@@ -61,6 +67,14 @@ export default async function HomePage() {
     <main className="min-h-screen">
       <DatelineBar />
       <Masthead />
+
+      <div className="max-w-7xl mx-auto px-4 pt-6">
+        <KPIStrip
+          scandals={recentScandals.length}
+          budgetDeficitFormatted={budgetSnapshot ? formatBudgetAmount(budgetSnapshot.deficit < 0n ? -budgetSnapshot.deficit : budgetSnapshot.deficit) : null}
+          budgetIsDeficit={budgetSnapshot ? budgetSnapshot.deficit > 0n : false}
+        />
+      </div>
 
       {carouselPeople.length > 0 && (
         <div className="max-w-7xl mx-auto px-4 pt-6">

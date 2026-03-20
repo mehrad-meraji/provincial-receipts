@@ -4,7 +4,7 @@
 
 **Goal:** Add a named individuals layer — lobbyists, donors, directors, and beneficiaries connected to Ford government payouts — with a homepage carousel, gallery page, detail pages, admin CRUD, and seed infrastructure.
 
-**Architecture:** Three new Prisma models (`Person`, `PersonConnection`, `PersonSource`) with a `Confidence` enum gate public visibility. A `lib/people.ts` helper enforces the confidence filter for all public queries. Admin routes query Prisma directly and see all records. The homepage gets a new `PeopleCarousel` section; `/people` and `/people/[slug]` are new server-rendered pages.
+**Architecture:** Three new Prisma models (`Person`, `PersonConnection`, `PersonSource`) with a `Confidence` enum gate public visibility. A `lib/people.ts` helper enforces the confidence filter for all public queries. Admin routes query Prisma directly and see all records. The homepage gets a new `PeopleCarousel` section; `/people` and `/people/[slug]` are new server-rendered pages. The entire feature is gated behind a `named_individuals_enabled` flag stored in a `SiteConfig` singleton row, toggled from the admin panel.
 
 **Tech Stack:** Next.js 15 App Router, Prisma 7 + Neon PostgreSQL, Tailwind CSS v4, Clerk auth, `next/image` for photos
 
@@ -14,7 +14,9 @@
 
 | Action | Path | Responsibility |
 |--------|------|----------------|
-| Modify | `prisma/schema.prisma` | Add `Confidence` enum, `Person`, `PersonConnection`, `PersonSource` models |
+| Modify | `prisma/schema.prisma` | Add `SiteConfig` model, `Confidence` enum, `Person`, `PersonConnection`, `PersonSource` models |
+| Create | `lib/feature-flags.ts` | Read `SiteConfig` singleton, return typed feature flag map |
+| Create | `app/api/admin/site-config/route.ts` | Admin GET + PATCH for `SiteConfig` singleton |
 | Create | `lib/people.ts` | Public-safe query helpers (confidence + published filter baked in) |
 | Modify | `app/globals.css` | Add `.person-photo-wrapper` newsprint filter styles |
 | Create | `app/components/people/PersonBadge.tsx` | Coloured connection-type pill |
@@ -22,8 +24,12 @@
 | Create | `app/components/people/PeopleCarousel.tsx` | Auto-scrolling horizontal strip for homepage |
 | Create | `app/people/page.tsx` | Gallery page with filter bar |
 | Create | `app/people/[slug]/page.tsx` | Detail page with bio, connections, sources |
-| Modify | `app/components/layout/TabNav.tsx` | Add "People" tab |
-| Modify | `app/page.tsx` | Import + render `<PeopleCarousel>` between masthead and timeline |
+| Modify | `app/components/layout/TabNav.tsx` | Accept `showPeople` prop; conditionally render "People" tab |
+| Modify | `app/components/layout/Masthead.tsx` | Make async; fetch feature flags; pass `showPeople` to `TabNav` |
+| Modify | `app/page.tsx` | Check feature flag; conditionally fetch + render `<PeopleCarousel>` |
+| Create | `app/api/admin/site-config/route.ts` | Admin GET + PATCH for feature flags |
+| Create | `app/admin/components/FeatureFlagsPanel.tsx` | Self-fetching toggle UI for feature flags |
+| Modify | `app/admin/page.tsx` | Add `<FeatureFlagsPanel />` section (before `<PeoplePanel />`) |
 | Create | `app/api/admin/people/route.ts` | Admin GET list + POST create |
 | Create | `app/api/admin/people/[id]/route.ts` | Admin GET single + PATCH update + DELETE |
 | Create | `app/api/admin/people/[id]/connections/route.ts` | Admin POST add connection |
@@ -50,6 +56,12 @@
 Add after the final model (after `TimelineEvent`):
 
 ```prisma
+// Feature flags — singleton row (id always "singleton")
+model SiteConfig {
+  id                        String  @id @default("singleton")
+  named_individuals_enabled Boolean @default(false)
+}
+
 enum Confidence {
   high
   medium
@@ -128,7 +140,93 @@ Expected: No errors. If `@prisma/client` types are stale, run `npx prisma genera
 
 ```bash
 git add prisma/schema.prisma prisma/migrations/
-git commit -m "feat: add Person, PersonConnection, PersonSource schema + Confidence enum"
+git commit -m "feat: add SiteConfig, Person, PersonConnection, PersonSource schema + Confidence enum"
+```
+
+---
+
+### Task 1b: Feature flag infrastructure
+
+**Files:**
+- Create: `lib/feature-flags.ts`
+- Create: `app/api/admin/site-config/route.ts`
+
+> **Prerequisite:** Task 1 must be complete and `npx prisma migrate dev` must have run so that `@prisma/client` exports the `SiteConfig` type.
+
+- [ ] **Step 1: Create `lib/feature-flags.ts`**
+
+```typescript
+import { prisma } from '@/lib/db'
+
+export type FeatureFlags = {
+  named_individuals_enabled: boolean
+}
+
+/**
+ * Reads feature flags from the SiteConfig singleton.
+ * Returns all flags defaulting to false if no row exists yet.
+ */
+export async function getFeatureFlags(): Promise<FeatureFlags> {
+  const config = await prisma.siteConfig.findUnique({ where: { id: 'singleton' } })
+  return {
+    named_individuals_enabled: config?.named_individuals_enabled ?? false,
+  }
+}
+```
+
+- [ ] **Step 2: Create `app/api/admin/site-config/route.ts`**
+
+```typescript
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@clerk/nextjs/server'
+import { prisma } from '@/lib/db'
+
+const DEFAULT_CONFIG = { id: 'singleton', named_individuals_enabled: false }
+
+export async function GET() {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const config = await prisma.siteConfig.findUnique({ where: { id: 'singleton' } })
+  return NextResponse.json(config ?? DEFAULT_CONFIG)
+}
+
+export async function PATCH(req: NextRequest) {
+  const { userId } = await auth()
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await req.json() as { named_individuals_enabled?: boolean }
+
+  const config = await prisma.siteConfig.upsert({
+    where: { id: 'singleton' },
+    create: {
+      id: 'singleton',
+      named_individuals_enabled: body.named_individuals_enabled ?? false,
+    },
+    update: {
+      ...(body.named_individuals_enabled !== undefined && {
+        named_individuals_enabled: body.named_individuals_enabled,
+      }),
+    },
+  })
+
+  return NextResponse.json(config)
+}
+```
+
+- [ ] **Step 3: Verify TypeScript**
+
+```bash
+npx tsc --noEmit
+```
+
+Expected: No errors.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add lib/feature-flags.ts app/api/admin/site-config/
+git commit -m "feat: add feature flag infrastructure (SiteConfig + API route)"
 ```
 
 ---
@@ -618,7 +716,9 @@ git commit -m "feat: add PeopleCarousel component with infinite scroll animation
 
 ```typescript
 import { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { getPeople } from '@/lib/people'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonCard from '@/app/components/people/PersonCard'
 import Link from 'next/link'
 
@@ -635,6 +735,9 @@ interface Props {
 }
 
 export default async function PeoplePage({ searchParams }: Props) {
+  const flags = await getFeatureFlags()
+  if (!flags.named_individuals_enabled) notFound()
+
   const { type } = await searchParams
   const people = await getPeople(type ? { connection_type: type } : undefined)
 
@@ -723,6 +826,7 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getPersonBySlug } from '@/lib/people'
+import { getFeatureFlags } from '@/lib/feature-flags'
 import PersonBadge from '@/app/components/people/PersonBadge'
 
 interface Props {
@@ -730,7 +834,8 @@ interface Props {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const [{ slug }, flags] = await Promise.all([params, getFeatureFlags()])
+  if (!flags.named_individuals_enabled) return { title: 'Not Found' }
   const person = await getPersonBySlug(slug)
   if (!person) return { title: 'Not Found' }
   return { title: `${person.name} — Ford Government Connections` }
@@ -745,7 +850,8 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
 }
 
 export default async function PersonPage({ params }: Props) {
-  const { slug } = await params
+  const [{ slug }, flags] = await Promise.all([params, getFeatureFlags()])
+  if (!flags.named_individuals_enabled) notFound()
   const person = await getPersonBySlug(slug)
   if (!person) notFound()
 
@@ -898,32 +1004,147 @@ git commit -m "feat: add /people/[slug] detail page"
 
 **Files:**
 - Modify: `app/components/layout/TabNav.tsx`
+- Modify: `app/components/layout/Masthead.tsx`
 - Modify: `app/page.tsx`
 
-- [ ] **Step 1: Add "People" tab to `app/components/layout/TabNav.tsx`**
+- [ ] **Step 1: Update `app/components/layout/TabNav.tsx` to accept a `showPeople` prop**
 
-Replace the `TABS` array:
+Replace the entire file contents:
 
 ```typescript
-const TABS = [
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+
+const BASE_TABS = [
   { label: 'Home',   href: '/' },
-  { label: 'People', href: '/people' },
   { label: 'Bills',  href: '/bills' },
   { label: 'MPPs',   href: '/mpps' },
   { label: 'Budget', href: '/budget' },
 ] as const
+
+const PEOPLE_TAB = { label: 'People', href: '/people' } as const
+
+interface TabNavProps {
+  showPeople?: boolean
+}
+
+export default function TabNav({ showPeople = false }: TabNavProps) {
+  const pathname = usePathname()
+
+  const tabs = showPeople
+    ? [BASE_TABS[0], PEOPLE_TAB, ...BASE_TABS.slice(1)]
+    : [...BASE_TABS]
+
+  function isActive(href: string) {
+    if (href === '/') return pathname === '/'
+    return pathname.startsWith(href)
+  }
+
+  return (
+    <nav aria-label="Site navigation" className="mt-3 flex justify-center gap-6 text-xs font-mono uppercase tracking-widest">
+      {tabs.map(({ label, href }) => (
+        <Link
+          key={href}
+          href={href}
+          aria-current={isActive(href) ? 'page' : undefined}
+          className={
+            isActive(href)
+              ? 'text-zinc-950 dark:text-white border-b border-zinc-950 dark:border-white pb-0.5'
+              : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors'
+          }
+        >
+          {label}
+        </Link>
+      ))}
+    </nav>
+  )
+}
 ```
 
-- [ ] **Step 2: Import `getPeopleForCarousel` and `PeopleCarousel` in `app/page.tsx`**
+- [ ] **Step 2: Update `app/components/layout/Masthead.tsx` to fetch flags and pass `showPeople` to `TabNav`**
+
+Replace the entire file contents:
+
+```typescript
+import TabNav from './TabNav'
+import { getFeatureFlags } from '@/lib/feature-flags'
+
+export default async function Masthead() {
+  const flags = await getFeatureFlags()
+
+  return (
+    <header className="w-full border-b-4 border-zinc-950 dark:border-white py-6 px-4 text-center">
+      {/* ASCII art - pre block with exact characters */}
+      <pre
+        className="text-[0.45rem] sm:text-[0.55rem] md:text-[0.65rem] leading-none select-none font-mono inline-block text-left"
+        aria-hidden="true"
+      >
+        <span className="flex gap-4">
+         {/* "FUCK" in Ontario red */}
+          <span style={{ color: '#c8102e' }} className="block">
+{`  █████▒█    ██  ▄████▄   ██ ▄█▀
+▓██   ▒ ██  ▓██▒▒██▀ ▀█   ██▄█▒
+▒████ ░▓██  ▒██░▒▓█    ▄ ▓███▄░
+░▓█▒  ░▓▓█  ░██░▒▓▓▄ ▄██▒▓██ █▄
+░▒█░   ▒▒█████▓ ▒ ▓███▀ ░▒██▒ █▄
+ ▒ ░   ░▒▓▒ ▒ ▒ ░ ░▒ ▒  ░▒ ▒▒ ▓▒
+ ░     ░░▒░ ░ ░   ░  ▒   ░ ░▒ ▒░
+ ░ ░    ░░░ ░ ░ ░        ░ ░░ ░
+          ░     ░ ░      ░  ░
+              ░`}
+          </span>
+          {/* "DOUG" in dark charcoal */}
+          <span className="text-[#1a1a1a] dark:text-white block">
+{`▓█████▄  ▒█████   █    ██    ▄████
+▒██▀ ██▌▒██▒  ██▒ ██  ▓██▒  ██▒ ▀█▒
+░██   █▌▒██░  ██▒▓██  ▒██░ ▒██░▄▄▄░
+░▓█▄   ▌▒██   ██░▓▓█  ░██░ ░▓█  ██▓
+░▒████▓ ░ ████▓▒░▒▒█████▓  ░▒▓███▀▒
+ ▒▒▓  ▒ ░ ▒░▒░▒░ ░▒▓▒ ▒ ▒   ░▒   ▒
+ ░ ▒  ▒   ░ ▒ ▒░ ░░▒░ ░ ░    ░   ░
+ ░ ░  ░ ░ ░ ░ ▒   ░░░ ░ ░  ░ ░   ░
+░        ░ ░     ░          ░   ░
+`}
+          </span>
+        </span>
+
+        {/* "FORD" in Ontario red */}
+        <span style={{ color: '#c8102e' }} className="block mt-1">
+{`  █████▒▒█████   ██▀███  ▓█████▄
+▓██   ▒▒██▒  ██▒▓██ ▒ ██▒▒██▀ ██▌
+▒████ ░▒██░  ██▒▓██ ░▄█ ▒░██   █▌
+░▓█▒  ░▒██   ██░▒██▀▀█▄  ░▓█▄   ▌
+░▒█░    ░ ████▓▒░░██▓ ▒██▒░▒████▓
+ ▒ ░    ░ ▒░▒░▒░ ░ ▒▓ ░▒▓░ ▒▒▓  ▒
+ ░        ░ ▒ ▒░   ░▒ ░ ▒░ ░ ▒  ▒
+ ░ ░    ░ ░ ░ ▒    ░░   ░  ░ ░  ░
+            ░ ░     ░        ░
+                           ░`}
+        </span>
+      </pre>
+      {/* Subtitle */}
+      <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400 uppercase tracking-widest font-mono">
+        Ontario&apos;s Premier Accountability Dashboard · Queen&apos;s Park Watch
+      </p>
+      <TabNav showPeople={flags.named_individuals_enabled} />
+    </header>
+  )
+}
+```
+
+- [ ] **Step 3: Import `getPeopleForCarousel`, `PeopleCarousel`, and `getFeatureFlags` in `app/page.tsx`**
 
 Add to the existing imports at the top:
 
 ```typescript
 import PeopleCarousel from './components/people/PeopleCarousel'
 import { getPeopleForCarousel } from '@/lib/people'
+import { getFeatureFlags } from '@/lib/feature-flags'
 ```
 
-- [ ] **Step 3: Add `getPeopleForCarousel` to the `Promise.all` in `app/page.tsx`**
+- [ ] **Step 4: Add feature flag fetch and conditional carousel query in `app/page.tsx`**
 
 Replace the existing `Promise.all` call:
 
@@ -931,7 +1152,7 @@ Replace the existing `Promise.all` call:
 const [
   recentScandals,
   dbTimelineEvents,
-  carouselPeople,
+  flags,
 ] = await Promise.all([
   prisma.scandal.findMany({
     where: { published: true },
@@ -943,13 +1164,17 @@ const [
   (prisma.timelineEvent as typeof prisma.timelineEvent | undefined)
     ?.findMany({ where: { published: true }, orderBy: { date: 'desc' } })
     .catch(() => []) ?? Promise.resolve([]),
-  getPeopleForCarousel(),
+  getFeatureFlags(),
 ])
+
+const carouselPeople = flags.named_individuals_enabled
+  ? await getPeopleForCarousel()
+  : []
 ```
 
-- [ ] **Step 4: Render `<PeopleCarousel>` between `<Masthead>` and the timeline section in `app/page.tsx`**
+- [ ] **Step 5: Render `<PeopleCarousel>` conditionally between `<Masthead>` and the timeline section in `app/page.tsx`**
 
-The current JSX order is `<DatelineBar />` → `<Masthead />` → `<div className="max-w-7xl ...">`. Insert the carousel **after `<Masthead />`**, not after `<DatelineBar />`. Find this exact block:
+Find this exact block:
 
 ```tsx
       <Masthead />
@@ -971,7 +1196,7 @@ Replace it with:
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-8">
 ```
 
-- [ ] **Step 5: Verify TypeScript**
+- [ ] **Step 6: Verify TypeScript**
 
 ```bash
 npx tsc --noEmit
@@ -979,23 +1204,23 @@ npx tsc --noEmit
 
 Expected: No errors.
 
-- [ ] **Step 6: Run a dev server smoke test**
+- [ ] **Step 7: Run a dev server smoke test**
 
 ```bash
 npm run dev
 ```
 
 Open http://localhost:3000. Verify:
-- "People" tab appears in the nav
-- The carousel section is hidden (no published people yet — that's correct)
-- Open http://localhost:3000/people — filter bar renders, "No individuals published yet." message shows
+- "People" tab does NOT appear in the nav (flag is off by default)
+- The carousel section is hidden
+- Open http://localhost:3000/people — returns 404 (flag is off)
 - Stop the dev server.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add app/components/layout/TabNav.tsx app/page.tsx
-git commit -m "feat: add People tab and carousel to homepage"
+git add app/components/layout/TabNav.tsx app/components/layout/Masthead.tsx app/page.tsx
+git commit -m "feat: gate People tab and carousel behind named_individuals_enabled flag"
 ```
 
 ---
@@ -1717,6 +1942,104 @@ git commit -m "feat: add PersonForm admin modal"
 
 ---
 
+### Task 11b: Create `FeatureFlagsPanel`
+
+**Files:**
+- Create: `app/admin/components/FeatureFlagsPanel.tsx`
+
+> **Prerequisite:** Task 1b must be complete (`lib/feature-flags.ts` + `/api/admin/site-config` route exist).
+
+- [ ] **Step 1: Create `app/admin/components/FeatureFlagsPanel.tsx`**
+
+```typescript
+'use client'
+
+import { useState, useEffect } from 'react'
+
+interface SiteConfig {
+  id: string
+  named_individuals_enabled: boolean
+}
+
+export default function FeatureFlagsPanel() {
+  const [config, setConfig] = useState<SiteConfig | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/site-config')
+      .then(r => r.json())
+      .then(setConfig)
+  }, [])
+
+  async function toggle(flag: keyof Omit<SiteConfig, 'id'>) {
+    if (!config) return
+    const next = !config[flag]
+    setSaving(true)
+    try {
+      const res = await fetch('/api/admin/site-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [flag]: next }),
+      })
+      if (res.ok) setConfig(await res.json())
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!config) {
+    return <p className="font-mono text-xs text-zinc-400">Loading…</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800">
+        <div>
+          <p className="font-mono text-xs font-bold text-zinc-950 dark:text-white">Named Individuals</p>
+          <p className="font-mono text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Show carousel, /people gallery, and /people/[slug] detail pages
+          </p>
+        </div>
+        <button
+          onClick={() => toggle('named_individuals_enabled')}
+          disabled={saving}
+          className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none disabled:opacity-50 ${
+            config.named_individuals_enabled
+              ? 'bg-zinc-950 dark:bg-white'
+              : 'bg-zinc-200 dark:bg-zinc-700'
+          }`}
+          aria-checked={config.named_individuals_enabled}
+          role="switch"
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white dark:bg-zinc-950 shadow ring-0 transition duration-200 ease-in-out ${
+              config.named_individuals_enabled ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  )
+}
+```
+
+- [ ] **Step 2: Verify TypeScript**
+
+```bash
+npx tsc --noEmit
+```
+
+Expected: No errors.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/admin/components/FeatureFlagsPanel.tsx
+git commit -m "feat: add FeatureFlagsPanel admin component"
+```
+
+---
+
 ### Task 12: Create `PeoplePanel` and wire into admin page
 
 **Files:**
@@ -1859,10 +2182,11 @@ export default function PeoplePanel() {
 }
 ```
 
-- [ ] **Step 2: Add `PeoplePanel` to `app/admin/page.tsx`**
+- [ ] **Step 2: Add `FeatureFlagsPanel` and `PeoplePanel` to `app/admin/page.tsx`**
 
-Add import at the top of the imports section:
+Add imports at the top of the imports section:
 ```typescript
+import FeatureFlagsPanel from './components/FeatureFlagsPanel'
 import PeoplePanel from './components/PeoplePanel'
 ```
 
@@ -1877,6 +2201,13 @@ Find this exact closing block at the end of the JSX in `app/admin/page.tsx`:
 Replace with:
 
 ```tsx
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold mb-4 border-b border-zinc-200 dark:border-zinc-700 pb-2">
+          Feature Flags
+        </h2>
+        <FeatureFlagsPanel />
       </section>
 
       <section>
@@ -1912,6 +2243,7 @@ npm run dev
 ```
 
 Navigate to `/admin` (requires Clerk login). Verify:
+- "Feature Flags" section appears with a "Named Individuals" toggle (initially off)
 - "People (0)" section appears
 - "Add Person" button opens the PersonForm modal
 - Creating a person with confidence `medium` + published `true` saves successfully
@@ -1920,9 +2252,23 @@ Navigate to `/admin` (requires Clerk login). Verify:
 - Connections and sources can be added via the edit form
 - Stop dev server.
 
-- [ ] **Step 6: Verify public carousel and gallery show the new person**
+- [ ] **Step 6: Verify feature flag toggle gates the public feature**
 
-Start dev server (`npm run dev`). Navigate to:
+Start dev server (`npm run dev`). Navigate to `/admin`:
+- Confirm "Named Individuals" toggle is OFF
+- Check http://localhost:3000 — carousel is hidden; "People" tab not in nav
+- Check http://localhost:3000/people — returns 404
+
+Toggle "Named Individuals" ON in the admin panel.
+
+- Check http://localhost:3000 — "People" tab appears in nav; carousel shows the person if at least one published high/medium person exists
+- Check http://localhost:3000/people — gallery page renders
+
+Toggle OFF again. Verify carousel and tab are hidden once more. Stop dev server.
+
+- [ ] **Step 7: Verify public carousel and gallery show the new person (flag ON)**
+
+Toggle flag ON. Navigate to:
 - `/` — carousel section "Connected Individuals" should now appear with 1 card
 - `/people` — the person appears in the grid
 - `/people/[slug]` — detail page renders correctly with bio, connections, sources
@@ -1933,8 +2279,8 @@ Check dark mode (toggle OS dark mode) and verify:
 - [ ] **Step 7: Commit**
 
 ```bash
-git add app/admin/components/PeoplePanel.tsx app/admin/page.tsx
-git commit -m "feat: add PeoplePanel to admin and wire up"
+git add app/admin/components/PeoplePanel.tsx app/admin/components/FeatureFlagsPanel.tsx app/admin/page.tsx
+git commit -m "feat: add FeatureFlagsPanel and PeoplePanel to admin"
 ```
 
 ---
@@ -2151,6 +2497,11 @@ Manually verify the following in dev mode (`npm run dev`):
 **Detail page:**
 - [ ] Low-confidence or unpublished slugs return 404
 - [ ] Sources grouped by type with correct labels
+
+**Feature flag:**
+- [ ] With flag OFF: `/people` returns 404, `/people/[slug]` returns 404, carousel hidden, "People" tab absent from nav
+- [ ] With flag ON: all public routes accessible, "People" tab visible in nav, carousel renders (if published people exist)
+- [ ] Toggling flag in admin panel takes effect on next page load (no server restart required)
 
 **Admin:**
 - [ ] Low confidence people appear in admin table (do NOT appear on public pages)

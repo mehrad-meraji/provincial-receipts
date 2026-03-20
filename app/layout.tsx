@@ -14,9 +14,33 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Fuck Doug Ford — Ontario Accountability Dashboard',
-  description: 'Tracking Ontario Government bills, MPPs, and scandals that affect Toronto. ProPublica-style transparency journalism.',
-  keywords: ['Ontario', 'Doug Ford', "Queen's Park", 'Toronto', 'legislature', 'bills', 'accountability'],
+  metadataBase: new URL('https://fuckdougford.ca'),
+  title: {
+    template: '%s | Fuck Doug Ford',
+    default: 'Fuck Doug Ford — Ontario Accountability Dashboard',
+  },
+  description: "Tracking Doug Ford's Ontario government: documented scandals, $46B+ in public service cuts, budget data, MPP votes, and the real cost to Ontarians. Independent civic transparency.",
+  keywords: [
+    'Doug Ford', 'Ontario government', "Queen's Park", 'Toronto', 'Ontario budget',
+    'Ontario scandals', 'MPP', 'Ford government cuts', 'Ontario accountability',
+    'Ontario transparency', 'Ontario legislature', 'Conservative Ontario',
+    'Ford scandals', 'Ontario public services',
+  ],
+  authors: [{ name: 'fuckdougford.ca', url: 'https://fuckdougford.ca' }],
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: 'website',
+    siteName: 'Fuck Doug Ford',
+    title: 'Fuck Doug Ford — Ontario Accountability Dashboard',
+    description: "Tracking Doug Ford's Ontario government: documented scandals, $46B+ in public service cuts, MPP votes, and the real cost to Ontarians.",
+    url: 'https://fuckdougford.ca',
+    locale: 'en_CA',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Fuck Doug Ford — Ontario Accountability Dashboard',
+    description: "Tracking Doug Ford's Ontario government: documented scandals, $46B+ in public service cuts, and the real cost to Ontarians.",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
