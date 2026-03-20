@@ -86,23 +86,24 @@ export default async function PersonPage({ params }: Props) {
         {/* Hero */}
         <div className="flex gap-8 mb-10">
           {/* Photo */}
-          <div className="flex-none person-photo-wrapper bg-zinc-950" style={{ width: 200, height: 240 }}>
-            {person.photo_filename ? (
-              <Image
-                src={`/people/${person.photo_filename}`}
-                alt={person.name}
-                width={200}
-                height={240}
-                className="object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center gap-2 select-none">
-                <span className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">[REDACTED]</span>
-                <span className="font-mono text-3xl font-bold text-zinc-600">
-                  {person.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('')}
-                </span>
-              </div>
-            )}
+          <div className="border border-slate-300 overflow-hidden h-72 w-52 relative flex-none">
+            <div className="person-photo-wrapper">
+              {person.photo_filename ? (
+                <Image
+                  src={`/people/${person.photo_filename}`}
+                  alt={person.name}
+                  fill
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 select-none">
+                  <span className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest">[REDACTED]</span>
+                  <span className="font-mono text-3xl font-bold text-zinc-600">
+                    {person.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('')}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Info */}
@@ -124,9 +125,9 @@ export default async function PersonPage({ params }: Props) {
               ))}
             </div>
             {totalCostFormatted && (
-              <div className="border border-red-800/40 bg-red-950/20 px-3 py-2 mb-3">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-red-500/80 mb-0.5">Estimated cost to Ontario</p>
-                <p className="font-mono text-xl font-bold text-red-500">{totalCostFormatted}</p>
+              <div className="border border-red-800/40 bg-ontario-red/10 px-3 py-2 mb-3">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ontario-red mb-0.5">Estimated cost to Ontario</p>
+                <p className="font-mono text-xl font-bold text-ontario-red">{totalCostFormatted}</p>
               </div>
             )}
             {person.bio && (
