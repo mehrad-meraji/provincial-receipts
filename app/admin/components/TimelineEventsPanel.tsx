@@ -9,16 +9,16 @@ import {
 
 // Curated icon options admins can pick from
 const ICON_OPTIONS: { name: string; label: string; Icon: LucideIcon }[] = [
-  { name: 'Newspaper',      label: 'News',       Icon: Newspaper },
-  { name: 'AlertTriangle',  label: 'Alert',      Icon: AlertTriangle },
-  { name: 'Flag',           label: 'Milestone',  Icon: Flag },
-  { name: 'Gavel',          label: 'Legal',      Icon: Gavel },
-  { name: 'Lock',           label: 'Lockdown',   Icon: Lock },
-  { name: 'Syringe',        label: 'Health',     Icon: Syringe },
-  { name: 'Vote',           label: 'Election',   Icon: Vote },
-  { name: 'Megaphone',      label: 'Protest',    Icon: Megaphone },
-  { name: 'FileText',       label: 'Document',   Icon: FileText },
-  { name: 'Globe',          label: 'World',      Icon: Globe },
+  { name: 'Newspaper', label: 'News', Icon: Newspaper },
+  { name: 'AlertTriangle', label: 'Alert', Icon: AlertTriangle },
+  { name: 'Flag', label: 'Milestone', Icon: Flag },
+  { name: 'Gavel', label: 'Legal', Icon: Gavel },
+  { name: 'Lock', label: 'Lockdown', Icon: Lock },
+  { name: 'Syringe', label: 'Health', Icon: Syringe },
+  { name: 'Vote', label: 'Election', Icon: Vote },
+  { name: 'Megaphone', label: 'Protest', Icon: Megaphone },
+  { name: 'FileText', label: 'Document', Icon: FileText },
+  { name: 'Globe', label: 'World', Icon: Globe },
 ]
 
 const ICON_MAP: Record<string, LucideIcon> = Object.fromEntries(
@@ -211,11 +211,10 @@ export default function TimelineEventsPanel({
                 type="button"
                 title={o.label}
                 onClick={() => setForm(f => ({ ...f, icon: o.name }))}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs border transition-colors ${
-                  form.icon === o.name
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs border transition-colors ${form.icon === o.name
                     ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                     : 'border-zinc-200 dark:border-zinc-700 text-zinc-500 hover:border-zinc-400'
-                }`}
+                  }`}
               >
                 <o.Icon size={12} />
                 {o.label}
@@ -244,7 +243,7 @@ export default function TimelineEventsPanel({
 
           {/* URL */}
           <input
-            type="url"
+            type="text"
             placeholder="URL (optional)"
             value={form.url}
             onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
@@ -321,11 +320,10 @@ export default function TimelineEventsPanel({
               <button
                 onClick={() => togglePublished(ev)}
                 title={ev.published ? 'Published — click to unpublish' : 'Draft — click to publish'}
-                className={`p-1 rounded transition-colors ${
-                  ev.published
+                className={`p-1 rounded transition-colors ${ev.published
                     ? 'text-green-500 hover:text-green-700'
                     : 'text-zinc-300 dark:text-zinc-600 hover:text-zinc-500'
-                }`}
+                  }`}
               >
                 {ev.published ? <Check size={14} /> : <Globe size={14} />}
               </button>
