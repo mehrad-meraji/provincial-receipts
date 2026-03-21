@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Building2, Globe, Clock, X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Switch } from '@/app/components/shared/Switch'
 
 const PREDEFINED_TAGS = ['housing', 'transit', 'ethics', 'environment', 'finance', 'other'] as const
 
@@ -381,14 +382,11 @@ export default function BillsPanel() {
                       {selectedBill.published ? 'Visible on public feed' : 'Hidden from public feed'}
                     </p>
                   </div>
-                  {/* Toggle switch */}
-                  <button
-                    onClick={handlePublishToggle}
+                  <Switch
+                    checked={selectedBill.published}
+                    onCheckedChange={() => handlePublishToggle()}
                     disabled={publishLoading}
-                    className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${selectedBill.published ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-                  >
-                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${selectedBill.published ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                  </button>
+                  />
                 </div>
               </div>
             </div>

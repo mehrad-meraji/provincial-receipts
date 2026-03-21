@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Switch } from '@/app/components/shared/Switch'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
@@ -535,15 +536,10 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
               <div>
                 <Label>Published</Label>
                 <div className="flex items-center gap-3 mt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPublished(p => !p)}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${published ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${published ? 'translate-x-5' : 'translate-x-0.5'}`}
-                    />
-                  </button>
+                  <Switch
+                    checked={published}
+                    onCheckedChange={setPublished}
+                  />
                   <span className="font-mono text-xs text-zinc-500">
                     {published ? 'Published' : 'Draft'}
                   </span>

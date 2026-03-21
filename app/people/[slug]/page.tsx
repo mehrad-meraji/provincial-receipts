@@ -38,11 +38,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const SOURCE_TYPE_LABELS: Record<string, string> = {
-  Registry:  'Government Registry',
-  News:      'News Report',
+  Registry: 'Government Registry',
+  News: 'News Report',
   Corporate: 'Corporate Filing',
-  Court:     'Court Filing',
-  FOI:       'FOI Document',
+  Court: 'Court Filing',
+  FOI: 'FOI Document',
 }
 
 export default async function PersonPage({ params }: Props) {
@@ -84,7 +84,7 @@ export default async function PersonPage({ params }: Props) {
         </Link>
 
         {/* Hero */}
-        <div className="flex gap-8 mb-10">
+        <div className="flex flex-col md:flex-row gap-8 mb-10">
           {/* Photo */}
           <div className="border border-slate-300 overflow-hidden h-72 w-52 relative flex-none">
             <div className="person-photo-wrapper">
