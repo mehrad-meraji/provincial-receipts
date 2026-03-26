@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Globe, ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import ScandalForm from './ScandalForm'
+import BulkActionBar from './BulkActionBar'
 
 interface ScandalRow {
   id: string
@@ -41,6 +42,7 @@ const FILTERS: { label: string; value: Filter }[] = [
 ]
 
 export default function ScandalsPanel() {
+  const router = useRouter()
   const [scandals, setScandals] = useState<ScandalRow[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -48,10 +50,8 @@ export default function ScandalsPanel() {
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
-
-  // Form overlay state
-  const [formOpen, setFormOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const fetchScandals = useCallback(async (p: number, f: Filter, q: string) => {
     setLoading(true)
@@ -74,42 +74,53 @@ export default function ScandalsPanel() {
     fetchScandals(page, filter, query)
   }, [fetchScandals, page, filter, query])
 
-  function handleFilterChange(f: Filter) {
-    setFilter(f)
-    setPage(1)
+  function handleFilterChange(f: Filter) { setFilter(f); setPage(1); setSelected(new Set()) }
+  function handleQueryChange(q: string) { setQuery(q); setPage(1); setSelected(new Set()) }
+  function handlePageChange(p: number) { setPage(p); setSelected(new Set()) }
+  function handleNewScandal() { router.push('/admin/scandals/new') }
+  function handleRowClick(scandal: ScandalRow) { router.push(`/admin/scandals/${scandal.id}`) }
+
+  function toggleSelected(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
-  function handleQueryChange(q: string) {
-    setQuery(q)
-    setPage(1)
+  function toggleAll() {
+    setSelected(prev =>
+      prev.size === scandals.length
+        ? new Set()
+        : new Set(scandals.map(s => s.id))
+    )
   }
 
-  function handlePageChange(p: number) {
-    setPage(p)
-  }
-
-  function handleNewScandal() {
-    setEditingId(null)
-    setFormOpen(true)
-  }
-
-  function handleRowClick(scandal: ScandalRow) {
-    setEditingId(scandal.id)
-    setFormOpen(true)
-  }
-
-  function handleFormClose() {
-    setFormOpen(false)
-    setEditingId(null)
-  }
-
-  function handleFormSaved() {
-    setFormOpen(false)
-    setEditingId(null)
-    fetchScandals(page, filter, query)
+  async function handleBulkAction(action: 'publish' | 'unpublish' | 'delete') {
+    if (selected.size === 0) return
+    if (action === 'delete' && !confirm(`Delete ${selected.size} scandal${selected.size !== 1 ? 's' : ''}? This cannot be undone.`)) return
+    setBulkLoading(true)
+    try {
+      const res = await fetch('/api/admin/scandals/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected], action }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        alert(data.error ?? 'Bulk action failed')
+        return
+      }
+      setSelected(new Set())
+      fetchScandals(page, filter, query)
+    } finally {
+      setBulkLoading(false)
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const allSelected = scandals.length > 0 && selected.size === scandals.length
+  const someSelected = selected.size > 0 && selected.size < scandals.length
 
   return (
     <div className="relative">
@@ -148,7 +159,16 @@ export default function ScandalsPanel() {
         </div>
 
         {/* Column headers */}
-        <div className="grid grid-cols-[1fr_140px_60px_60px_60px_60px_40px] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+        <div className="grid grid-cols-[32px_1fr_140px_60px_60px_60px_60px_40px] px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-zinc-400 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              ref={el => { if (el) el.indeterminate = someSelected }}
+              onChange={toggleAll}
+              className="cursor-pointer"
+            />
+          </div>
           <span>Title</span>
           <span>Date Reported</span>
           <span className="text-center">Bills</span>
@@ -172,8 +192,23 @@ export default function ScandalsPanel() {
             <button
               key={scandal.id}
               onClick={() => handleRowClick(scandal)}
-              className="w-full grid grid-cols-[1fr_140px_60px_60px_60px_60px_40px] px-3 py-2.5 text-left text-sm border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+              className={`w-full grid grid-cols-[32px_1fr_140px_60px_60px_60px_60px_40px] px-3 py-2.5 text-left text-sm border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${
+                selected.has(scandal.id) ? 'bg-blue-50 dark:bg-blue-950/20' : ''
+              }`}
             >
+              <span
+                className="flex items-center justify-center"
+                onClick={e => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(scandal.id)}
+                  onChange={() => toggleSelected(scandal.id)}
+                  onClick={e => e.stopPropagation()}
+                  disabled={bulkLoading}
+                  className="cursor-pointer"
+                />
+              </span>
               <span className="text-xs text-zinc-700 dark:text-zinc-300 truncate pr-2">
                 {scandal.title}
               </span>
@@ -202,6 +237,16 @@ export default function ScandalsPanel() {
           ))}
         </div>
 
+        {/* Bulk action bar */}
+        <BulkActionBar
+          count={selected.size}
+          loading={bulkLoading}
+          onPublish={() => handleBulkAction('publish')}
+          onUnpublish={() => handleBulkAction('unpublish')}
+          onDelete={() => handleBulkAction('delete')}
+          onClear={() => setSelected(new Set())}
+        />
+
         {/* Pagination */}
         <div className="flex items-center justify-between px-3 py-2 border-t border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 text-xs font-mono text-zinc-500">
           <span>{total} scandal{total !== 1 ? 's' : ''}</span>
@@ -224,15 +269,6 @@ export default function ScandalsPanel() {
           </div>
         </div>
       </div>
-
-      {/* Full-screen form overlay */}
-      {formOpen && (
-        <ScandalForm
-          scandalId={editingId}
-          onClose={handleFormClose}
-          onSaved={handleFormSaved}
-        />
-      )}
     </div>
   )
 }

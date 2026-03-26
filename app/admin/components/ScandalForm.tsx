@@ -458,18 +458,29 @@ export default function ScandalForm({ scandalId, onClose, onSaved }: ScandalForm
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-zinc-950 overflow-y-auto">
+    <div className="bg-white dark:bg-zinc-950 min-h-screen">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-700 px-6 py-4 flex items-center justify-between">
         <h2 className="font-mono text-sm font-semibold text-zinc-800 dark:text-zinc-200">
           {isEdit ? 'Edit Scandal' : 'New Scandal'}
         </h2>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400"
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1.5 text-xs font-mono border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="px-3 py-1.5 text-xs font-mono bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 rounded hover:bg-zinc-700 dark:hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
       </div>
 
       {loading ? (

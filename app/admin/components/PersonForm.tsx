@@ -197,16 +197,28 @@ export default function PersonForm({ editingId, onClose, onSaved }: PersonFormPr
   const labelClass = 'block text-[10px] font-mono uppercase tracking-widest text-zinc-500 dark:text-zinc-400 mb-1'
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-start justify-center overflow-y-auto py-8">
-      <div className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 w-full max-w-2xl mx-4">
+    <div className="bg-white dark:bg-zinc-950 min-h-screen">
+      <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="sticky top-0 z-10 bg-white dark:bg-zinc-950 flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="font-mono text-sm uppercase tracking-widest font-bold">
             {isEdit ? 'Edit Person' : 'Add Person'}
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-950 dark:hover:text-white">
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-xs font-mono border border-zinc-300 dark:border-zinc-600 text-zinc-600 dark:text-zinc-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !name.trim() || !slug.trim()}
+              className="px-3 py-1.5 text-xs font-mono bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded disabled:opacity-40 transition-colors"
+            >
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Person'}
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-6 space-y-5">
