@@ -235,7 +235,6 @@ export default async function HomePage() {
       </div>
 
       <footer className="border-t border-zinc-200 dark:border-zinc-800 mt-12 py-6 text-center text-xs dark:text-zinc-400 text-zinc-600 font-mono">
-        <p>Data sourced from Ontario Legislative Assembly · Updated every 6 hours</p>
         <p className="mt-1">This is a civic transparency project. Not affiliated with the Government of Ontario.</p>
       </footer>
     </main>

@@ -4,6 +4,10 @@ import { neonConfig } from '@neondatabase/serverless'
 
 if (typeof WebSocket !== 'undefined') {
   neonConfig.webSocketConstructor = WebSocket
+} else {
+  // Node.js < 21 doesn't have a global WebSocket — use the ws package
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  neonConfig.webSocketConstructor = require('ws')
 }
 
 function makeClient() {
